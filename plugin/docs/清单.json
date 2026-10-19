@@ -1,0 +1,10 @@
+{
+  "说明": "plugin/docs 下这几份是工作区文档的副本，改真源后跑 verify/sync_docs.cjs",
+  "files": {
+    "操作指引.md": "2d360d1a50be89b2881f636772f93f31137f65f3e9cbcf3d0cf085d0770f9565",
+    "使用说明.md": "c9b8bf8e99014ff3c7f8b9095d82ca2585bb2a265e13e299bce3a6ddf2bb4125",
+    "踩坑与设计决策.md": "43947a640554b47dd78b2095fcc72bfe8eabd4972a0c22abf67627dae5c60782",
+    "版本记录.md": "1f524acb50d2d22dc88148426d06efde1c298fa3164796d67e745530271b7d77",
+    "README.md": "6dce288d7b0eeb4c4256e5b80e0c77fc78988868cedb07a941a3861fbe93c108"
+  }
+}

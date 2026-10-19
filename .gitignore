@@ -1,0 +1,14 @@
+# 私人数据：绝不进仓库（用 / 开头锚定仓库根，别误伤 plugin/assets/sounds/）
+/state.json
+/library.json
+/library.json.*
+/images/
+/sounds/
+/diagnose/
+*.bak_*
+*.premerge_*
+
+# 打包/临时
+/_archive/
+node_modules/
+*.log
