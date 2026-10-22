@@ -362,8 +362,8 @@ async function post(baseUrl, pathname, body) {
       ok('★ 清单和文件来自**同一个源**（否则哈希必然对不上）',
         !!usedManifest && !!usedFile && usedManifest.which === usedFile.which,
         `清单用=${usedManifest?.which} 文件用=${usedFile?.which}（全部尝试：清单=${manifestHits.map((h) => h.which)} 文件=${fileHits.map((h) => h.which)}）`)
-      ok('第一顺位是 raw.githubusercontent（直连 GitHub，永远新鲜）',
-        manifestHits[0]?.which === 'raw', `第一次尝试=${manifestHits[0]?.which}（首选源）`)
+      ok('第一顺位是 jsDelivr（国内实测最稳：连测 5 次全过、250ms 量级）',
+        manifestHits[0]?.which === 'cdn', `第一次尝试=${manifestHits[0]?.which}（首选源）`)
       ok('报告里记了用的哪个源（排查时能一眼看出）', typeof dl7.json?.source === 'string' && dl7.json.source.length > 0, String(dl7.json?.source))
       h7.server.close()
     }
@@ -379,8 +379,8 @@ async function post(baseUrl, pathname, body) {
           : u.includes('cdn.jsdelivr.net') ? 'cdn'
             : u.includes('api.github.com') ? 'api' : 'other'
         hits2.push({ which, url: u })
-        // 首选源（raw）一律挂掉 —— 模拟它在国内不通
-        if (which === 'raw') return { ok: false, status: 503, text: async () => '' }
+        // 首选源（jsDelivr）一律挂掉 —— 模拟它的边缘出问题
+        if (which === 'cdn') return { ok: false, status: 503, text: async () => '' }
         if (u.includes('release-manifest.json')) {
           return { ok: true, text: async () => JSON.stringify(manifest) }
         }
@@ -400,8 +400,10 @@ async function post(baseUrl, pathname, body) {
       ok('★ 退到备胎后，清单和文件仍然同源',
         !!usedM8 && !!usedF8 && usedM8.which === usedF8.which,
         `清单用=${usedM8?.which} 文件用=${usedF8?.which}（尝试过：清单=${m8.map((h) => h.which)} 文件=${f8.map((h) => h.which)}）`)
-      ok('用的不再是首选源', usedM8?.which !== 'raw', `实际用上=${usedM8?.which}`)
-      ok('首选源确实先被试过（不是直接跳过 raw）', m8[0]?.which === 'raw', `第一次=${m8[0]?.which}`)
+      ok('用的不再是首选源', usedM8?.which !== 'cdn', `实际用上=${usedM8?.which}`)
+      ok('首选源确实先被试过（不是直接跳过它）', m8[0]?.which === 'cdn', `第一次=${m8[0]?.which}`)
+      ok('★ 退到的是 raw（它不走 CDN 缓存 ⇒ 绕开了「缓存陈旧」这个坑）',
+        usedM8?.which === 'raw', `实际用上=${usedM8?.which}`)
       h8.server.close()
     }
 

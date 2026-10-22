@@ -1292,13 +1292,17 @@ export function apply(ctx, config) {
    *   清单从 A 取、文件从 B 取，两边版本不一致时**必然**对不上。
    *   所以：**先选定一个源，清单和文件都用它**，不混着来。
    *
-   * 【源的顺序：为什么 raw.githubusercontent 排第一】
-   *   ① `raw.githubusercontent.com` —— **直连 GitHub，永远是分支最新**，
-   *      不经过 CDN 缓存（实测：jsDelivr 给 1.6.0 时它给 1.8.13）。
-   *      代价：国内偶尔慢一点（但只是读一个小 JSON + 十几个文件）。
-   *   ② `cdn.jsdelivr.net` —— 国内快，但**边缘缓存可能陈旧**（实测踩过）。
-   *      留作**备胎**：raw 挂了就用它（这时清单和文件也都从它取，仍然同源）。
-   *   ③ `api.github.com/contents` —— 备胎二的备胎，返回 base64，代码多一点。
+   * 【源的顺序：jsDelivr 排第一，raw 排第二 —— 这是实测定的】
+   *   ⚠️ 一开始我把 raw.githubusercontent 排到了第一（想的是「直连 GitHub 不会缓存陈旧」），
+   *      **真机一测就发现排错了**：
+   *      · `raw.githubusercontent.com` 在本机**根本连不上**（Node fetch 直接 `fetch failed`，
+   *        10.7 秒超时；curl 连测 8 个文件挂了 6 个）⇒ 国内网络对 raw 不友好。
+   *      · `cdn.jsdelivr.net` 反而**稳**：清单连测 5 次全过（7225/249/266/250/266ms），
+   *        18 个文件**全部新鲜**（推完 v1.8.14 后 package.json 也是 1.8.14）。
+   *   ⇒ **jsDelivr 第一（快、稳），raw 第二（永不缓存陈旧，当备胎）。**
+   *   ⚠️ jsDelivr 的「陈旧」不是常态，是**个别文件长期被轮询**才热起来的
+   *      （package.json 是插件唯一每 6 小时查一次的文件）。真出问题时，
+   *      **换到 raw 就绕过了缓存** —— 这才是备胎的意义。
    *
    * 【为什么不用 @latest】
    *   实测：`@latest` 解析到的是**最新的 tag**（v1.8.13），**不是分支头**。
@@ -1313,13 +1317,13 @@ export function apply(ctx, config) {
     const ref = String(branch ?? '').trim() || 'main'
     return [
       {
-        name: 'github-raw',
+        name: 'jsdelivr',
         // 清单在 publish/ 下，文件路径跟仓库里的相对路径一致 ⇒ 同一个 base 通吃
-        base: `https://raw.githubusercontent.com/${repo}/${ref}/`,
+        base: `https://cdn.jsdelivr.net/gh/${repo}@${ref}/`,
       },
       {
-        name: 'jsdelivr',
-        base: `https://cdn.jsdelivr.net/gh/${repo}@${ref}/`,
+        name: 'github-raw',
+        base: `https://raw.githubusercontent.com/${repo}/${ref}/`,
       },
       {
         name: 'github-contents',
@@ -1635,20 +1639,26 @@ export function apply(ctx, config) {
    * ⚠️【10-22 23:5x 改了源顺序】原来第一顺位是 jsDelivr，
    *    但实测它对个别文件的边缘缓存是陈旧的（还给 1.6.0，而远端已经是 1.8.13）——
    *    面板会因此显示"没有新版本"（拿到的版本号比现装还旧）。
-   *    ⇒ 改成 **raw.githubusercontent 优先**（直连 GitHub，永远是分支最新），
-   *      jsDelivr 退成备胎。
+   *    ⇒ 加了 **raw.githubusercontent 作为备胎**（它不走 CDN 缓存，永远是分支最新）。
+   *
+   * ⚠️【10-23 00:2x 又调回来了 —— 真机实测定的】
+   *    一度把 raw 排到第一位（想的是"直连 GitHub 不会缓存陈旧"），
+   *    **真机一测就发现排错了**：raw.githubusercontent 在本机**根本连不上**
+   *    （Node fetch 直接 `fetch failed`，10.7 秒超时；curl 连测 8 个文件挂 6 个）——
+   *    国内网络对 raw 不友好。而 jsDelivr 反而**稳**（连测 5 次全过，250ms 量级）。
+   *    ⇒ **jsDelivr 第一（快、稳），raw 第二（永不缓存陈旧，当备胎）。**
    */
   async function fetchRemoteVersion(repo, branch, pkgPath = 'plugin/package.json') {
     const timeout = typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(6000) : undefined
     const sources = [
       {
-        name: 'github-raw',
-        url: `https://raw.githubusercontent.com/${repo}/${branch}/${pkgPath}`,
+        name: 'jsdelivr',
+        url: `https://cdn.jsdelivr.net/gh/${repo}@${branch}/${pkgPath}`,
         read: (text) => String(JSON.parse(text)?.version ?? ''),
       },
       {
-        name: 'jsdelivr',
-        url: `https://cdn.jsdelivr.net/gh/${repo}@${branch}/${pkgPath}`,
+        name: 'github-raw',
+        url: `https://raw.githubusercontent.com/${repo}/${branch}/${pkgPath}`,
         read: (text) => String(JSON.parse(text)?.version ?? ''),
       },
       {
