@@ -1275,33 +1275,151 @@ export function apply(ctx, config) {
   }
 
   /**
+   * ═══════════════════════════════════════════════════════════════
+   * 取源清单：**清单和文件必须从同一个源取**（这是这一版的要害）
+   * ═══════════════════════════════════════════════════════════════
+   *
+   * 【为什么必须有这个函数】2026-10-22 实测踩出来的：
+   *   原来「取清单」和「下载文件」各自写死 `cdn.jsdelivr.net/gh/<repo>@<branch>/`。
+   *   那天推完 v1.8.13，jsDelivr 对**其中 1 个文件**（plugin/package.json）
+   *   的边缘缓存是陈旧的（还给 1.6.0），而清单那份是新的（1.8.13）。
+   *   ⇒ 清单说「package.json 该是这个哈希」，CDN 给的是旧内容
+   *   ⇒ 下载在**哈希核对那一步**直接失败，报 `hash-mismatch`，
+   *      **用户看到的就是「下载更新」按钮点了没反应**。
+   *
+   * 【判据：清单与文件必须同源】
+   *   哈希核对只有在一个源内部才有意义 ——
+   *   清单从 A 取、文件从 B 取，两边版本不一致时**必然**对不上。
+   *   所以：**先选定一个源，清单和文件都用它**，不混着来。
+   *
+   * 【源的顺序：为什么 raw.githubusercontent 排第一】
+   *   ① `raw.githubusercontent.com` —— **直连 GitHub，永远是分支最新**，
+   *      不经过 CDN 缓存（实测：jsDelivr 给 1.6.0 时它给 1.8.13）。
+   *      代价：国内偶尔慢一点（但只是读一个小 JSON + 十几个文件）。
+   *   ② `cdn.jsdelivr.net` —— 国内快，但**边缘缓存可能陈旧**（实测踩过）。
+   *      留作**备胎**：raw 挂了就用它（这时清单和文件也都从它取，仍然同源）。
+   *   ③ `api.github.com/contents` —— 备胎二的备胎，返回 base64，代码多一点。
+   *
+   * 【为什么不用 @latest】
+   *   实测：`@latest` 解析到的是**最新的 tag**（v1.8.13），**不是分支头**。
+   *   而 tag 是发版时才打的 ⇒ 用 @latest 就变成「发完版才看得到新版」，
+   *   反而更慢。**用分支头（main）才对** —— 推上去就能看到。
+   *
+   * @param {string} repo   owner/repo
+   * @param {string} branch 分支名
+   * @returns {Array<{name: string, base: string}>} 按优先级排好的源
+   */
+  function updateSources(repo, branch) {
+    const ref = String(branch ?? '').trim() || 'main'
+    return [
+      {
+        name: 'github-raw',
+        // 清单在 publish/ 下，文件路径跟仓库里的相对路径一致 ⇒ 同一个 base 通吃
+        base: `https://raw.githubusercontent.com/${repo}/${ref}/`,
+      },
+      {
+        name: 'jsdelivr',
+        base: `https://cdn.jsdelivr.net/gh/${repo}@${ref}/`,
+      },
+      {
+        name: 'github-contents',
+        base: `https://api.github.com/repos/${repo}/contents/`,
+      },
+    ]
+  }
+
+  /**
+   * 从某个源读一个文本文件（拿清单用）
+   * @returns {Promise<string|null>} 读不到返回 null
+   */
+  async function fetchTextFrom(source, path) {
+    const timeout = typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(8000) : undefined
+    try {
+      let url
+      if (source.name === 'github-contents') {
+        url = `${source.base}${path}?ref=${source.ref ?? 'main'}`
+      } else {
+        url = source.base + path
+      }
+      const res = await fetch(url, { headers: { 'user-agent': 'dsh-skin' }, signal: timeout })
+      if (!res.ok) return null
+      if (source.name === 'github-contents') {
+        const payload = JSON.parse(await res.text())
+        if (!payload || typeof payload.content !== 'string') return null
+        return Buffer.from(payload.content, 'base64').toString('utf8')
+      }
+      return await res.text()
+    } catch {
+      return null
+    }
+  }
+
+  /**
+   * 从某个源读一个二进制文件（下载用）
+   * @returns {Promise<Buffer|null>} 读不到返回 null
+   */
+  async function fetchBufferFrom(source, path) {
+    const timeout = typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(20000) : undefined
+    try {
+      let url
+      if (source.name === 'github-contents') {
+        url = `${source.base}${path}?ref=${source.ref ?? 'main'}`
+      } else {
+        url = source.base + path
+      }
+      const res = await fetch(url, { headers: { 'user-agent': 'dsh-skin' }, signal: timeout })
+      if (!res.ok) return null
+      if (source.name === 'github-contents') {
+        const payload = JSON.parse(await res.text())
+        if (!payload || typeof payload.content !== 'string') return null
+        return Buffer.from(payload.content, 'base64')
+      }
+      return Buffer.from(await res.arrayBuffer())
+    } catch {
+      return null
+    }
+  }
+
+  /**
    * GET /dsh-skin/update-manifest → 远端那份发布清单（带哈希）
    *
    * 跟 update-check 分开：那个只回**一个版本号**（省流量），
    * 这个回**整份清单**（下载时才需要）。
+   *
+   * ⚠️ 清单里**不记用的是哪个源** —— 真正的下载那一步会**自己重新选一次源**，
+   *    选中的源会连同清单一起记下来（见 handleUpdateDownload）。
+   *    这样两边**必然同源**，哈希核对才有意义（见 updateSources 的注释）。
    */
   async function handleUpdateManifest(req, res) {
     const repo = String(config?.updateRepo ?? '').trim()
     if (repo === '') return sendJson(res, 200, { ok: false, reason: 'not-configured' })
     const branch = String(config?.updateBranch ?? 'main').trim() || 'main'
-    const url = `https://cdn.jsdelivr.net/gh/${repo}@${branch}/publish/release-manifest.json`
-    const timeout = typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(8000) : undefined
-    try {
-      const res2 = await fetch(url, { headers: { 'user-agent': 'dsh-skin' }, signal: timeout })
-      if (!res2.ok) return sendJson(res, 200, { ok: false, reason: 'manifest-unavailable' })
-      const manifest = JSON.parse(await res2.text())
-      const files = Array.isArray(manifest?.files) ? manifest.files : []
-      if (files.length === 0) return sendJson(res, 200, { ok: false, reason: 'manifest-empty' })
-      return sendJson(res, 200, { ok: true, manifest })
-    } catch {
-      return sendJson(res, 200, { ok: false, reason: 'manifest-unavailable' })
+    const manifestPath = 'publish/release-manifest.json'
+    for (const source of updateSources(repo, branch)) {
+      const text = await fetchTextFrom(source, manifestPath)
+      if (text === null) continue
+      try {
+        const manifest = JSON.parse(text)
+        const files = Array.isArray(manifest?.files) ? manifest.files : []
+        if (files.length === 0) continue
+        return sendJson(res, 200, { ok: true, manifest })
+      } catch {
+        /* 这份不是合法清单，试下一个源 */
+      }
     }
+    return sendJson(res, 200, { ok: false, reason: 'manifest-unavailable' })
   }
 
   /**
    * POST /dsh-skin/update-download → **只下载到暂存目录，不碰现装的那份**
    *
-   * 返回 { ok, version, staged, files, bytes }
+   * 返回 { ok, version, staged, files, bytes, source }
+   *
+   * ⚠️【要害：清单和文件必须同源】
+   *   2026-10-22 实测：jsDelivr 对个别文件的边缘缓存是陈旧的，
+   *   而清单那份是新的 ⇒ 清单里的哈希对不上 CDN 给的旧内容 ⇒ 报 `hash-mismatch`，
+   *   用户看到「下载更新」点了没反应。
+   *   ⇒ 这里**选一次源，清单和所有文件都用它**（updateSources 的注释里有判据）。
    */
   async function handleUpdateDownload(req, res) {
     const repo = String(config?.updateRepo ?? '').trim()
@@ -1309,18 +1427,27 @@ export function apply(ctx, config) {
     const branch = String(config?.updateBranch ?? 'main').trim() || 'main'
     const stage = stagingDir()
     if (stage === '') return sendJson(res, 200, { ok: false, reason: 'no-data-dir' })
-    const base = `https://cdn.jsdelivr.net/gh/${repo}@${branch}/`
+    const manifestPath = 'publish/release-manifest.json'
 
-    // ① 先拿清单
+    // ① 选一个源，把**清单和文件**都锁定在它上面
+    let source = null
     let manifest = null
-    try {
-      const timeout = typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(8000) : undefined
-      const res2 = await fetch(`${base}publish/release-manifest.json`, { headers: { 'user-agent': 'dsh-skin' }, signal: timeout })
-      if (!res2.ok) return sendJson(res, 200, { ok: false, reason: 'manifest-unavailable' })
-      manifest = JSON.parse(await res2.text())
-    } catch {
-      return sendJson(res, 200, { ok: false, reason: 'manifest-unavailable' })
+    for (const candidate of updateSources(repo, branch)) {
+      const text = await fetchTextFrom(candidate, manifestPath)
+      if (text === null) continue
+      try {
+        const parsed = JSON.parse(text)
+        const list = Array.isArray(parsed?.files) ? parsed.files : []
+        if (list.length === 0) continue
+        source = candidate
+        manifest = parsed
+        break
+      } catch {
+        /* 这份不是合法清单，试下一个源 */
+      }
     }
+    if (!source || !manifest) return sendJson(res, 200, { ok: false, reason: 'manifest-unavailable' })
+
     const files = Array.isArray(manifest?.files) ? manifest.files : []
     if (files.length === 0) return sendJson(res, 200, { ok: false, reason: 'manifest-empty' })
     const version = String(manifest?.version ?? '')
@@ -1338,10 +1465,8 @@ export function apply(ctx, config) {
         if (rel === '' || rel.includes('..') || rel.startsWith('/') || rel.includes('\\')) {
           return sendJson(res, 200, { ok: false, reason: 'manifest-path-invalid' })
         }
-        const timeout = typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(20000) : undefined
-        const res2 = await fetch(base + rel, { headers: { 'user-agent': 'dsh-skin' }, signal: timeout })
-        if (!res2.ok) return sendJson(res, 200, { ok: false, reason: 'download-failed', file: rel })
-        const buf = Buffer.from(await res2.arrayBuffer())
+        const buf = await fetchBufferFrom(source, rel)
+        if (buf === null) return sendJson(res, 200, { ok: false, reason: 'download-failed', file: rel })
         // 逐文件核对哈希 —— 挡"下载损坏/被截断"
         if (expect !== '' && createHash('sha256').update(buf).digest('hex') !== expect) {
           return sendJson(res, 200, { ok: false, reason: 'hash-mismatch', file: rel })
@@ -1372,6 +1497,8 @@ export function apply(ctx, config) {
         files: files.length,
         bytes,
         staged: true,
+        // 记下用的哪个源 —— 排查"下载失败"时能一眼看出是源的问题还是包的问题
+        source: source.name,
         // 明确告诉页面"还没替换"——替换要用户点确认
         applied: false,
         notice: 'downloaded',
@@ -1504,10 +1631,21 @@ export function apply(ctx, config) {
    * ⚠️ `pkgPath` 不能写死成 `plugin/package.json`：
    *    换肤仓库的清单在 `plugin/` 下，手机远程的清单在**仓库根目录** —— 两个仓库布局不一样。
    *    写死路径查手机远程会一直 404（实测过）。
+   *
+   * ⚠️【10-22 23:5x 改了源顺序】原来第一顺位是 jsDelivr，
+   *    但实测它对个别文件的边缘缓存是陈旧的（还给 1.6.0，而远端已经是 1.8.13）——
+   *    面板会因此显示"没有新版本"（拿到的版本号比现装还旧）。
+   *    ⇒ 改成 **raw.githubusercontent 优先**（直连 GitHub，永远是分支最新），
+   *      jsDelivr 退成备胎。
    */
   async function fetchRemoteVersion(repo, branch, pkgPath = 'plugin/package.json') {
     const timeout = typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(6000) : undefined
     const sources = [
+      {
+        name: 'github-raw',
+        url: `https://raw.githubusercontent.com/${repo}/${branch}/${pkgPath}`,
+        read: (text) => String(JSON.parse(text)?.version ?? ''),
+      },
       {
         name: 'jsdelivr',
         url: `https://cdn.jsdelivr.net/gh/${repo}@${branch}/${pkgPath}`,

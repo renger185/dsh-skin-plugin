@@ -1,13 +1,13 @@
 {
   "schema": "dsh-skin/release-manifest/v1",
-  "version": "1.8.13",
-  "publishedAt": "2026-10-22T15:43:54.916Z",
+  "version": "1.8.14",
+  "publishedAt": "2026-10-22T16:08:05.246Z",
   "notes": "",
   "files": [
     {
       "path": "plugin/index.js",
-      "bytes": 91522,
-      "sha256": "87d29f8fa2808c1da492cc830efc2e3c60805b592db3eb1037793378f111a5e7"
+      "bytes": 97692,
+      "sha256": "a4b388beab2a8a526c96d3cad791a1da99976a89a4eadc5c33dfb89fa8929653"
     },
     {
       "path": "plugin/client.js",
@@ -17,7 +17,7 @@
     {
       "path": "plugin/package.json",
       "bytes": 943,
-      "sha256": "e0f5a667f32db39672475265346d378f66a934d72c4a6f19069b9a5955b4b00c"
+      "sha256": "647f656813c212194b4e23a02d3345aeae55781bb697002d21fe63914549c3a6"
     },
     {
       "path": "plugin/cordis.patch.yml",
@@ -37,12 +37,12 @@
     {
       "path": "plugin/locale/zh.json",
       "bytes": 239,
-      "sha256": "82461674c5c8920e68508549b3d863607d617cffd7a28880a42cef42a7029d4b"
+      "sha256": "36870d97862e1eed9f21e91d3f4eeac2e2356620d568f413a4d91c06bdb86611"
     },
     {
       "path": "plugin/locale/en.json",
       "bytes": 214,
-      "sha256": "a89c41da4bf30559360fbcff32e58194099b85f100da1dabf1d065c7925b2fe6"
+      "sha256": "c356ba01da3d7dae965a9f1553113c5f6da98b9186887af8bcff7113e853fb7b"
     },
     {
       "path": "plugin/docs/README.md",
@@ -61,18 +61,18 @@
     },
     {
       "path": "plugin/docs/版本记录.md",
-      "bytes": 96688,
-      "sha256": "df7d1e75d4fee7f67aec77dfd0216a1fb871d75d16dfad9c6fc9a6ccd68ffab1"
+      "bytes": 100747,
+      "sha256": "ff7f29d693e5a8bd433fa1c40044cfffefe68fd69fd2321b2dd04f65a7ad285d"
     },
     {
       "path": "plugin/docs/踩坑与设计决策.md",
       "bytes": 63501,
-      "sha256": "1ffcd67196c7afa83a9dd315b935ec66072b0d7a67e15e9d3dc85bbdb70cf9b9"
+      "sha256": "211f692f20ccdbf73f9f19a3b43a54d107bcac46cd7545d9d9752af3db7eb058"
     },
     {
       "path": "plugin/docs/清单.json",
       "bytes": 584,
-      "sha256": "e39538746b15c0116a452e9b1bd36739cf4ccc11652b45ad757433c1244062ac"
+      "sha256": "2cdd7d5c48a8a01238733371c03171520e19ba058ef72d72375198de2625f21d"
     },
     {
       "path": "plugin/assets/sounds/ding.mp3",

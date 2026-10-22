@@ -311,6 +311,135 @@ async function post(baseUrl, pathname, body) {
       h6.server.close()
     }
 
+    /* ══ ⑦ 【10-22 23:5x 新增】清单与文件必须同源 ══════════
+     *
+     * 【为什么要有这一节】2026-10-22 实测出来的真事故：
+     *   jsDelivr 对**个别文件**的边缘缓存是陈旧的（plugin/package.json 还给 1.6.0），
+     *   而同一时刻清单那份是新的（1.8.13）。
+     *   ⇒ 清单说"这个文件该是这个哈希"，CDN 给的是旧内容
+     *   ⇒ 下载在哈希核对那一步报 `hash-mismatch`
+     *   ⇒ 用户看到的是「下载更新」按钮点了没反应，**而且看不出原因**。
+     *
+     * 【判据】
+     *   ① 第一顺位是 raw.githubusercontent（直连 GitHub，永远新鲜）
+     *   ② 清单和文件**都从这个源取**（不混着来）
+     *   ③ 源挂了要能退到下一个源，且**退过去之后仍然同源**
+     *   ④ 首选源给的旧内容时，**不会**拿别的源的新内容来凑 —— 那正是出事的那条路
+     */
+    console.log('')
+    console.log('7 清单与文件同源：CDN 缓存陈旧时不会拿旧内容凑数')
+    {
+      /** 记录每次请求打到了哪个源 —— 用来证明"清单和文件来自同一个源" */
+      const hits = []
+      globalThis.fetch = async (url) => {
+        const u = String(url)
+        const isRaw = u.includes('raw.githubusercontent.com')
+        const isCdn = u.includes('cdn.jsdelivr.net')
+        const isApi = u.includes('api.github.com')
+        const which = isRaw ? 'raw' : isCdn ? 'cdn' : isApi ? 'api' : 'other'
+        hits.push({ which, url: u })
+        if (u.includes('release-manifest.json')) {
+          return { ok: true, text: async () => JSON.stringify(manifest) }
+        }
+        if (u.includes(probeName)) {
+          return { ok: true, arrayBuffer: async () => Buffer.from(after, 'utf8') }
+        }
+        return { ok: false, text: async () => '' }
+      }
+      const h7 = await bootHost(cfg)
+      const dl7 = await post(h7.baseUrl, '/dsh-skin/update-download', { method: 'download' })
+      ok('下载成功', dl7.json?.ok === true, JSON.stringify(dl7.json))
+      const manifestHits = hits.filter((h) => h.url.includes('release-manifest.json'))
+      const fileHits = hits.filter((h) => h.url.includes(probeName))
+      /**
+       * ⚠️ 判据要取**最后一次**命中，不是第一次。
+       *    源码是「按顺序试源，前一个失败才试下一个」——
+       *    所以第一次请求可能打在挂掉的源上，**最后那次才是真正用上的源**。
+       *    （第一版这里取 hits[0] → 判据误报"不同源"，其实代码完全正确。）
+       */
+      const usedManifest = manifestHits[manifestHits.length - 1]
+      const usedFile = fileHits[fileHits.length - 1]
+      ok('★ 清单和文件来自**同一个源**（否则哈希必然对不上）',
+        !!usedManifest && !!usedFile && usedManifest.which === usedFile.which,
+        `清单用=${usedManifest?.which} 文件用=${usedFile?.which}（全部尝试：清单=${manifestHits.map((h) => h.which)} 文件=${fileHits.map((h) => h.which)}）`)
+      ok('第一顺位是 raw.githubusercontent（直连 GitHub，永远新鲜）',
+        manifestHits[0]?.which === 'raw', `第一次尝试=${manifestHits[0]?.which}（首选源）`)
+      ok('报告里记了用的哪个源（排查时能一眼看出）', typeof dl7.json?.source === 'string' && dl7.json.source.length > 0, String(dl7.json?.source))
+      h7.server.close()
+    }
+
+    /* ══ ⑧ 首选源挂了 → 退到下一个源，且仍然同源 ═══════════ */
+    console.log('')
+    console.log('8 首选源挂了：退到备胎，退过去之后仍然同源')
+    {
+      const hits2 = []
+      globalThis.fetch = async (url) => {
+        const u = String(url)
+        const which = u.includes('raw.githubusercontent.com') ? 'raw'
+          : u.includes('cdn.jsdelivr.net') ? 'cdn'
+            : u.includes('api.github.com') ? 'api' : 'other'
+        hits2.push({ which, url: u })
+        // 首选源（raw）一律挂掉 —— 模拟它在国内不通
+        if (which === 'raw') return { ok: false, status: 503, text: async () => '' }
+        if (u.includes('release-manifest.json')) {
+          return { ok: true, text: async () => JSON.stringify(manifest) }
+        }
+        if (u.includes(probeName)) {
+          return { ok: true, arrayBuffer: async () => Buffer.from(after, 'utf8') }
+        }
+        return { ok: false, text: async () => '' }
+      }
+      const h8 = await bootHost(cfg)
+      const dl8 = await post(h8.baseUrl, '/dsh-skin/update-download', { method: 'download' })
+      ok('首选源挂了也能下成功', dl8.json?.ok === true, JSON.stringify(dl8.json))
+      const m8 = hits2.filter((h) => h.url.includes('release-manifest.json'))
+      const f8 = hits2.filter((h) => h.url.includes(probeName))
+      // ⚠️ 取**最后一次**命中 = 真正用上的那个源（源码是「前一个失败才试下一个」）
+      const usedM8 = m8[m8.length - 1]
+      const usedF8 = f8[f8.length - 1]
+      ok('★ 退到备胎后，清单和文件仍然同源',
+        !!usedM8 && !!usedF8 && usedM8.which === usedF8.which,
+        `清单用=${usedM8?.which} 文件用=${usedF8?.which}（尝试过：清单=${m8.map((h) => h.which)} 文件=${f8.map((h) => h.which)}）`)
+      ok('用的不再是首选源', usedM8?.which !== 'raw', `实际用上=${usedM8?.which}`)
+      ok('首选源确实先被试过（不是直接跳过 raw）', m8[0]?.which === 'raw', `第一次=${m8[0]?.which}`)
+      h8.server.close()
+    }
+
+    /* ══ ⑨ CDN 给的是旧内容时 → 必须报 hash-mismatch，不能悄悄放过 ══
+     *
+     * 【这一条是反着的判据】验证"核对哈希这道防线还在"：
+     *   万一将来某个源开始返回旧内容，**绝不能**让它悄悄通过。
+     */
+    console.log('')
+    console.log('9 源返回旧内容：哈希核对必须拦下来（不能悄悄放过）')
+    {
+      globalThis.fetch = async (url) => {
+        const u = String(url)
+        if (u.includes('release-manifest.json')) {
+          return { ok: true, text: async () => JSON.stringify(manifest) }
+        }
+        if (u.includes(probeName)) {
+          // 故意给**旧内容**（哈希跟清单对不上）
+          return { ok: true, arrayBuffer: async () => Buffer.from('STALE CONTENT', 'utf8') }
+        }
+        return { ok: false, text: async () => '' }
+      }
+      const h9 = await bootHost(cfg)
+      /**
+       * ⚠️ 要跟**这一段开始前**的内容比，不是跟最初的 OLD 比。
+       *    第 4 段已经成功替换过一次了 ⇒ 此刻装的是 NEW，不是 OLD。
+       *    （拿固定的 OLD 去比 → 判据误报"现装的那份被改了"，其实代码完全正确。）
+       */
+      const beforeApply9 = fs.readFileSync(probePath, 'utf8')
+      const dl9 = await post(h9.baseUrl, '/dsh-skin/update-download', { method: 'download' })
+      ok('旧内容被哈希核对拦下（hash-mismatch）',
+        dl9.json?.ok === false && dl9.json?.reason === 'hash-mismatch', JSON.stringify(dl9.json))
+      ok('★ 现装的那份没被这一段碰过（下载失败不写任何东西）',
+        fs.readFileSync(probePath, 'utf8') === beforeApply9,
+        `这段之前是「${beforeApply9}」，现在是「${fs.readFileSync(probePath, 'utf8')}」`)
+      h9.server.close()
+    }
+
     globalThis.fetch = realFetch
     server.close()
   } finally {
