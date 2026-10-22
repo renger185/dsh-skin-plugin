@@ -1,7 +1,7 @@
 {
   "schema": "dsh-skin/release-manifest/v1",
   "version": "1.8.13",
-  "publishedAt": "2026-10-22T14:29:22.751Z",
+  "publishedAt": "2026-10-22T15:42:05.414Z",
   "notes": "",
   "files": [
     {
@@ -66,8 +66,8 @@
     },
     {
       "path": "plugin/docs/踩坑与设计决策.md",
-      "bytes": 63400,
-      "sha256": "668c1a7e426fb6aac0a6897cd815a46b5878462ac3a6495c0cc7a30858cdbeaf"
+      "bytes": 63501,
+      "sha256": "1ffcd67196c7afa83a9dd315b935ec66072b0d7a67e15e9d3dc85bbdb70cf9b9"
     },
     {
       "path": "plugin/docs/清单.json",
