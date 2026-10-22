@@ -1,13 +1,13 @@
 {
   "schema": "dsh-skin/release-manifest/v1",
   "version": "1.8.14",
-  "publishedAt": "2026-10-22T16:28:23.522Z",
+  "publishedAt": "2026-10-22T16:35:30.930Z",
   "notes": "",
   "files": [
     {
       "path": "plugin/index.js",
-      "bytes": 98643,
-      "sha256": "e00629263c37935e04ccec81046142a9c204ca63cfe27aadcf9c666434d4f892"
+      "bytes": 101064,
+      "sha256": "3ec3fb7c04eb40924e72ded098dc0da50321e1158fff8b4ace0d54095223b765"
     },
     {
       "path": "plugin/client.js",
@@ -61,8 +61,8 @@
     },
     {
       "path": "plugin/docs/版本记录.md",
-      "bytes": 101992,
-      "sha256": "692fc9ea81489e6668292bcfdf6481692f0275d7f55aaa8ec00b821f2e558cae"
+      "bytes": 103096,
+      "sha256": "b9f7ee038579cbfc3c862c292cb2e4c1a86c4415e90bf7ce221e65afcecfe8b1"
     },
     {
       "path": "plugin/docs/踩坑与设计决策.md",
@@ -72,7 +72,7 @@
     {
       "path": "plugin/docs/清单.json",
       "bytes": 584,
-      "sha256": "1cf905947be2afcd45b35115b0704d4e835c6b3829ad7f59682502c63bd697f2"
+      "sha256": "ba08d01a47a8968923fdd9410dbbedb94abe27f632bd704a68d13168c3ce284e"
     },
     {
       "path": "plugin/assets/sounds/ding.mp3",

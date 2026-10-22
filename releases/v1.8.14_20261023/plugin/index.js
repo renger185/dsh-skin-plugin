@@ -1292,17 +1292,30 @@ export function apply(ctx, config) {
    *   清单从 A 取、文件从 B 取，两边版本不一致时**必然**对不上。
    *   所以：**先选定一个源，清单和文件都用它**，不混着来。
    *
-   * 【源的顺序：jsDelivr 排第一，raw 排第二 —— 这是实测定的】
-   *   ⚠️ 一开始我把 raw.githubusercontent 排到了第一（想的是「直连 GitHub 不会缓存陈旧」），
-   *      **真机一测就发现排错了**：
-   *      · `raw.githubusercontent.com` 在本机**根本连不上**（Node fetch 直接 `fetch failed`，
-   *        10.7 秒超时；curl 连测 8 个文件挂了 6 个）⇒ 国内网络对 raw 不友好。
-   *      · `cdn.jsdelivr.net` 反而**稳**：清单连测 5 次全过（7225/249/266/250/266ms），
-   *        18 个文件**全部新鲜**（推完 v1.8.14 后 package.json 也是 1.8.14）。
-   *   ⇒ **jsDelivr 第一（快、稳），raw 第二（永不缓存陈旧，当备胎）。**
-   *   ⚠️ jsDelivr 的「陈旧」不是常态，是**个别文件长期被轮询**才热起来的
-   *      （package.json 是插件唯一每 6 小时查一次的文件）。真出问题时，
-   *      **换到 raw 就绕过了缓存** —— 这才是备胎的意义。
+   * 【源的顺序：raw 第一，jsDelivr 第二 —— 这是两轮实测定的】
+   *   ⚠️ 我在这上面**反复了一次**（自己打自己的脸），过程记下来：
+   *   第一版把 jsDelivr 排第一（它当时稳），后来看到「个别文件缓存陈旧」就改成 raw 第一；
+   *   改完真机一测，raw **连不上**（Node fetch `fetch failed`、10.7 秒超时；curl 8 个文件挂 6 个）
+   *   ⇒ 又改回 jsDelivr 第一。
+   *   **然后又测了一轮，才把真相测出来** ——
+   *   那次 raw 连不上是**偶发**（网络抖动），不是常态。连测：raw 清单 **6/6 成功**
+   *   （774/978/1472/999/331/328ms），大文件 91KB **4/4 成功**（2667/2434/1394/1111ms）。
+   *
+   *   **决定性的那组数据**（同一份清单，两轮实测）：
+   *   | 源 | 清单 | 文件哈希对上 | 取不到 |
+   *   |---|---|---|---|
+   *   | jsDelivr | v1.8.14 | **15/18** | 0 |
+   *   | github-raw | v1.8.14 | **18/18** | 0 |
+   *   ⇒ **jsDelivr 每个文件各缓存各的**（清单刷新了，某些文件还是旧的），
+   *     连测两轮都是**同样那 3 个文件**不符（plugin/index.js、docs/版本记录.md、docs/清单.json）
+   *     ⇒ 这**不是偶发**，是它的缓存机制决定的。
+   *   ⇒ 而「清单和文件同源」这个判据，**只有 raw 能真正满足**：
+   *     jsDelivr 同一个源内部都不一致，清单是新的、文件是旧的。
+   *   ⇒ **raw 第一（唯一能保证一致），jsDelivr 第二（国内快，但当备胎时可能哈希不符）**。
+   *
+   *   ⚠️ 备胎也不是万能的：万一退到 jsDelivr 而它正好缓存陈旧，
+   *      哈希核对会拦住（报 hash-mismatch）—— **这是好事**：
+   *      总比"装上去一个半新半旧的版本"强。
    *
    * 【为什么不用 @latest】
    *   实测：`@latest` 解析到的是**最新的 tag**（v1.8.13），**不是分支头**。
@@ -1317,13 +1330,13 @@ export function apply(ctx, config) {
     const ref = String(branch ?? '').trim() || 'main'
     return [
       {
-        name: 'jsdelivr',
+        name: 'github-raw',
         // 清单在 publish/ 下，文件路径跟仓库里的相对路径一致 ⇒ 同一个 base 通吃
-        base: `https://cdn.jsdelivr.net/gh/${repo}@${ref}/`,
+        base: `https://raw.githubusercontent.com/${repo}/${ref}/`,
       },
       {
-        name: 'github-raw',
-        base: `https://raw.githubusercontent.com/${repo}/${ref}/`,
+        name: 'jsdelivr',
+        base: `https://cdn.jsdelivr.net/gh/${repo}@${ref}/`,
       },
       {
         name: 'github-contents',
@@ -1419,11 +1432,14 @@ export function apply(ctx, config) {
    *
    * 返回 { ok, version, staged, files, bytes, source }
    *
-   * ⚠️【要害：清单和文件必须同源】
-   *   2026-10-22 实测：jsDelivr 对个别文件的边缘缓存是陈旧的，
-   *   而清单那份是新的 ⇒ 清单里的哈希对不上 CDN 给的旧内容 ⇒ 报 `hash-mismatch`，
-   *   用户看到「下载更新」点了没反应。
-   *   ⇒ 这里**选一次源，清单和所有文件都用它**（updateSources 的注释里有判据）。
+   * ⚠️【要害：整个下载过程必须「一个源 + 全套校验」】
+   *   2026-10-22 实测：jsDelivr **每个文件各缓存各的** ——
+   *   清单刷新了，但某些文件还是旧的（连测两轮都是同样那 3 个文件不符）。
+   *   ⇒ 「清单和文件同源」这个判据**还不够**：同一个源内部也可能不一致。
+   *   ⇒ 所以这里改成：**一个源从头走到尾**（取清单 → 下全部文件 → 逐个核哈希），
+   *     **任何一步不过，就换下一个源重头再来**。
+   *   ⇒ 换源重来的代价是白下一次（无副作用，暂存目录每次清空），
+   *     换来的是**装上去的一定是同一版**。
    */
   async function handleUpdateDownload(req, res) {
     const repo = String(config?.updateRepo ?? '').trim()
@@ -1433,83 +1449,120 @@ export function apply(ctx, config) {
     if (stage === '') return sendJson(res, 200, { ok: false, reason: 'no-data-dir' })
     const manifestPath = 'publish/release-manifest.json'
 
-    // ① 选一个源，把**清单和文件**都锁定在它上面
-    let source = null
-    let manifest = null
+    /** 最后一次失败的原因（换源全失败时，报这个） */
+    let lastReason = 'manifest-unavailable'
+    let lastFile = ''
+
+    // ① 依次试每个源：**一个源走完全程**，全程过了才算数
     for (const candidate of updateSources(repo, branch)) {
       const text = await fetchTextFrom(candidate, manifestPath)
-      if (text === null) continue
+      if (text === null) {
+        // ⚠️ 别覆盖更有信息量的原因（hash-mismatch 更有用，见下面注释）
+        if (lastReason !== 'hash-mismatch') lastReason = 'manifest-unavailable'
+        continue
+      }
+      let manifest = null
       try {
         const parsed = JSON.parse(text)
         const list = Array.isArray(parsed?.files) ? parsed.files : []
-        if (list.length === 0) continue
-        source = candidate
+        if (list.length === 0) {
+          // ⚠️ 别覆盖更有信息量的原因（hash-mismatch 更有用，见下面注释）
+          if (lastReason !== 'hash-mismatch') lastReason = 'manifest-empty'
+          continue
+        }
         manifest = parsed
-        break
       } catch {
-        /* 这份不是合法清单，试下一个源 */
+        if (lastReason !== 'hash-mismatch') lastReason = 'manifest-unavailable'
+        continue
       }
-    }
-    if (!source || !manifest) return sendJson(res, 200, { ok: false, reason: 'manifest-unavailable' })
 
-    const files = Array.isArray(manifest?.files) ? manifest.files : []
-    if (files.length === 0) return sendJson(res, 200, { ok: false, reason: 'manifest-empty' })
-    const version = String(manifest?.version ?? '')
+      const files = Array.isArray(manifest?.files) ? manifest.files : []
+      const version = String(manifest?.version ?? '')
 
-    // ② 下载到暂存目录，**一个字节都不写进安装目录**
-    const staged = join(stage, version || 'unknown')
-    try {
-      await rm(staged, { recursive: true, force: true })
-      await mkdir(staged, { recursive: true })
+      // ② 下载到暂存目录，**一个字节都不写进安装目录**
+      const staged = join(stage, version || 'unknown')
       let bytes = 0
-      for (const file of files) {
-        const rel = String(file?.path ?? '')
-        const expect = String(file?.sha256 ?? '')
-        // 路径不许越出暂存目录（清单来自网络，必须防目录穿越）
-        if (rel === '' || rel.includes('..') || rel.startsWith('/') || rel.includes('\\')) {
-          return sendJson(res, 200, { ok: false, reason: 'manifest-path-invalid' })
+      let failed = null
+      try {
+        await rm(staged, { recursive: true, force: true })
+        await mkdir(staged, { recursive: true })
+        for (const file of files) {
+          const rel = String(file?.path ?? '')
+          const expect = String(file?.sha256 ?? '')
+          // 路径不许越出暂存目录（清单来自网络，必须防目录穿越）
+          if (rel === '' || rel.includes('..') || rel.startsWith('/') || rel.includes('\\')) {
+            failed = { reason: 'manifest-path-invalid', file: rel }
+            break
+          }
+          const buf = await fetchBufferFrom(candidate, rel)
+          if (buf === null) {
+            failed = { reason: 'download-failed', file: rel }
+            break
+          }
+          // 逐文件核对哈希 —— 挡"下载损坏/被截断"，也挡"这个源内部缓存不一致"
+          if (expect !== '' && createHash('sha256').update(buf).digest('hex') !== expect) {
+            failed = { reason: 'hash-mismatch', file: rel }
+            break
+          }
+          const target = join(staged, rel)
+          await mkdir(dirname(target), { recursive: true })
+          await writeFile(target, buf)
+          bytes += buf.length
         }
-        const buf = await fetchBufferFrom(source, rel)
-        if (buf === null) return sendJson(res, 200, { ok: false, reason: 'download-failed', file: rel })
-        // 逐文件核对哈希 —— 挡"下载损坏/被截断"
-        if (expect !== '' && createHash('sha256').update(buf).digest('hex') !== expect) {
-          return sendJson(res, 200, { ok: false, reason: 'hash-mismatch', file: rel })
+      } catch (error) {
+        failed = { reason: 'download-failed', file: '', error: String(error?.message ?? error) }
+      }
+
+      // 这个源全程过了 → 就用它
+      if (!failed) {
+        updateStaged = {
+          version,
+          dir: staged,
+          /**
+           * ⚠️ 这里必须存**文件清单本身**（不是文件数）。
+           *    第一版只存了 `files: files.length`（一个数字），
+           *    替换时要逐个遍历文件 → `for (const file of 数字)` 直接抛
+           *    「number is not iterable」→ 备份阶段就炸了，而且报的是 `backup-failed`，
+           *    **跟真正的原因对不上**，极难查。
+           */
+          files,
+          fileCount: files.length,
+          bytes,
+          at: Date.now(),
         }
-        const target = join(staged, rel)
-        await mkdir(dirname(target), { recursive: true })
-        await writeFile(target, buf)
-        bytes += buf.length
+        return sendJson(res, 200, {
+          ok: true,
+          version,
+          files: files.length,
+          bytes,
+          staged: true,
+          // 记下用的哪个源 —— 排查"下载失败"时能一眼看出是源的问题还是包的问题
+          source: candidate.name,
+          // 明确告诉页面"还没替换"——替换要用户点确认
+          applied: false,
+          notice: 'downloaded',
+        })
       }
-      updateStaged = {
-        version,
-        dir: staged,
-        /**
-         * ⚠️ 这里必须存**文件清单本身**（不是文件数）。
-         *    第一版只存了 `files: files.length`（一个数字），
-         *    替换时要逐个遍历文件 → `for (const file of 数字)` 直接抛
-         *    「number is not iterable」→ 备份阶段就炸了，而且报的是 `backup-failed`，
-         *    **跟真正的原因对不上**，极难查。
-         */
-        files,
-        fileCount: files.length,
-        bytes,
-        at: Date.now(),
+
+      // 这个源没过 ⇒ 记下原因，**换下一个源从头再来**
+      /**
+       * ⚠️ 原因要取**最有信息量的那个**：
+       *   `hash-mismatch` 比 `manifest-unavailable` 有用得多 ——
+       *   前者说明"东西拿到了但对不上"（多半是缓存陈旧），
+       *   后者只说明"这个源没给出清单"。
+       *   ⇒ 只要**任何一个**源报过 hash-mismatch，最终就报它。
+       */
+      if (failed.reason === 'hash-mismatch' || lastReason !== 'hash-mismatch') {
+        lastReason = failed.reason
       }
-      return sendJson(res, 200, {
-        ok: true,
-        version,
-        files: files.length,
-        bytes,
-        staged: true,
-        // 记下用的哪个源 —— 排查"下载失败"时能一眼看出是源的问题还是包的问题
-        source: source.name,
-        // 明确告诉页面"还没替换"——替换要用户点确认
-        applied: false,
-        notice: 'downloaded',
-      })
-    } catch (error) {
-      return sendJson(res, 200, { ok: false, reason: 'download-failed', error: String(error?.message ?? error) })
+      lastFile = failed.file
+      // 目录穿越这种是**清单本身有问题**，换源也没用 —— 直接报出去
+      if (failed.reason === 'manifest-path-invalid') {
+        return sendJson(res, 200, { ok: false, reason: failed.reason, file: failed.file })
+      }
     }
+
+    return sendJson(res, 200, { ok: false, reason: lastReason, file: lastFile })
   }
 
   /**
@@ -1636,29 +1689,27 @@ export function apply(ctx, config) {
    *    换肤仓库的清单在 `plugin/` 下，手机远程的清单在**仓库根目录** —— 两个仓库布局不一样。
    *    写死路径查手机远程会一直 404（实测过）。
    *
-   * ⚠️【10-22 23:5x 改了源顺序】原来第一顺位是 jsDelivr，
-   *    但实测它对个别文件的边缘缓存是陈旧的（还给 1.6.0，而远端已经是 1.8.13）——
+   * ⚠️【10-22 23:5x 加了 raw 作备胎】原来只有 jsDelivr 一个源，
+   *    它对个别文件的边缘缓存是陈旧的（还给 1.6.0，而远端已经是 1.8.13）——
    *    面板会因此显示"没有新版本"（拿到的版本号比现装还旧）。
-   *    ⇒ 加了 **raw.githubusercontent 作为备胎**（它不走 CDN 缓存，永远是分支最新）。
    *
-   * ⚠️【10-23 00:2x 又调回来了 —— 真机实测定的】
-   *    一度把 raw 排到第一位（想的是"直连 GitHub 不会缓存陈旧"），
-   *    **真机一测就发现排错了**：raw.githubusercontent 在本机**根本连不上**
-   *    （Node fetch 直接 `fetch failed`，10.7 秒超时；curl 连测 8 个文件挂 6 个）——
-   *    国内网络对 raw 不友好。而 jsDelivr 反而**稳**（连测 5 次全过，250ms 量级）。
-   *    ⇒ **jsDelivr 第一（快、稳），raw 第二（永不缓存陈旧，当备胎）。**
+   * ⚠️【10-23 00:3x 源顺序最终定稿】**以「同一个源内部一致」为准绳**（不是「哪个快」）：
+   *    实测同一份清单：jsDelivr **15/18**（它每个文件各缓存各的），
+   *    github-raw **18/18**。⇒ raw 第一（唯一能保证整套一致），jsDelivr 第二。
+   *    （注：raw 偶尔会连不上，那是**偶发**网络抖动 —— 连测清单 6/6 成功。
+   *      真的连不上会自动退到 jsDelivr，且哈希核对会兜住。）
    */
   async function fetchRemoteVersion(repo, branch, pkgPath = 'plugin/package.json') {
     const timeout = typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(6000) : undefined
     const sources = [
       {
-        name: 'jsdelivr',
-        url: `https://cdn.jsdelivr.net/gh/${repo}@${branch}/${pkgPath}`,
+        name: 'github-raw',
+        url: `https://raw.githubusercontent.com/${repo}/${branch}/${pkgPath}`,
         read: (text) => String(JSON.parse(text)?.version ?? ''),
       },
       {
-        name: 'github-raw',
-        url: `https://raw.githubusercontent.com/${repo}/${branch}/${pkgPath}`,
+        name: 'jsdelivr',
+        url: `https://cdn.jsdelivr.net/gh/${repo}@${branch}/${pkgPath}`,
         read: (text) => String(JSON.parse(text)?.version ?? ''),
       },
       {
