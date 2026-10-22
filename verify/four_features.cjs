@@ -1,5 +1,5 @@
 /**
- * 作者 10-18 20:45 点头的四条(A 换一张 / B 球位置记住 / C 自动换肤绿点 / D 模糊过渡可调)自检。
+ * boss 10-18 20:45 点头的四条(A 换一张 / B 球位置记住 / C 自动换肤绿点 / D 模糊过渡可调)自检。
  *
  * 能真跑的就真跑:
  *   - D:把插件里 portraitCssFor 原样抠出来 eval,分别喂 64 和 0,看垫底层在不在
@@ -56,13 +56,14 @@ ok('客户端把 ballX/ballY 存进设置文件', /saveState\(\{ ballX: at\.x, b
 ok('启动时读回来', /state\.ballX === null \|\| state\.ballY === null\) return/.test(SRC))
 ok('读取时按窗口大小夹一下(小屏不会找不到球)', /window\.innerWidth - 56/.test(SRC))
 
-/* ── A:手动换一张 ──────────────────────────────────────── */
+/* ── A:手动换一张 →【10-22 20:1x boss】改成「下一张」（按图库顺序）── */
 console.log('')
-console.log('A 面板上手动换一张')
-ok('按钮挂在图库上方', SRC.includes("dict.pickRandom"))
-ok('点了会抽一张不是当前的这张', /const next = pickRandomImageId\(\)\s*\n\s*if \(next\) void selectImage\(next\)/.test(SRC))
-ok('抽签本身排除当前图', /library\.filter\(\(item\) => item\.id !== state\.activeId\)/.test(SRC))
-ok('图库不足两张时不显示这个按钮', /library\.length > 1[\s\S]{0,400}dict\.pickRandom/.test(SRC))
+console.log('A 面板上手动换一张（10-22 起改为「下一张」：按图库顺序走）')
+ok('按钮挂在图库上方', SRC.includes("dict.pickNext"))
+ok('点了会走下一张（按顺序，不是随机）', /const next = pickNextImageId\(\)\s*\n\s*if \(next\) void selectImage\(next\)/.test(SRC))
+ok('顺序是按图库下标往后走，末尾回到第一张', /library\[\(at \+ 1\) % library\.length\]/.test(SRC))
+ok('图库不足两张时不显示这个按钮', /library\.length > 1[\s\S]{0,400}dict\.pickNext/.test(SRC))
+ok('自动轮换仍是随机的（那才是它的本意）', /const next = pickRandomImageId\(\)/.test(SRC))
 
 /* ── C:自动换肤开着时球上带绿点 ────────────────────────── */
 console.log('')
@@ -72,7 +73,7 @@ ok('按 rotateMinutes 决定显不显示', /state\.rotateMinutes > 0[\s\S]{0,400
 ok('用的是和转圈同一个绿', SRC.includes("'#00e676'"))
 ok('绿点不吃鼠标事件,不挡拖动', /pointerEvents: 'none'/.test(SRC))
 
-/* ── E:面板里「恢复默认界面」排在最上面(作者 10-19 18:29)──────── */
+/* ── E:面板里「恢复默认界面」排在最上面(boss 10-19 18:29)──────── */
 console.log('')
 console.log('E 悬浮窗里「恢复默认界面」放最上面')
 {
@@ -85,10 +86,16 @@ console.log('E 悬浮窗里「恢复默认界面」放最上面')
   ok('恢复默认按钮只有一处(搬走没留旧的)', hits === 1, `实际 ${hits} 处`)
   ok('它排在「模式」之前(也就是面板第一个)', atRestore > 0 && atMode > 0 && atRestore < atMode)
   ok('也不在读数段那段尾巴里', atStatus > 0 && atRestore < atStatus)
-  ok('按钮下面还带着说明那句话(不是光秃秃一个按钮)', /dict\.restore,[\s\S]{0,200}dict\.restoreHint/.test(SRC))
-  ok('注释里记着作者原话', /恢复默认放在最上面/.test(SRC))
+  /**
+   * ⚠️ 2026-10-22：这条原来只允许 200 个字符的跨度。
+   *    10-22 boss要求在「恢复默认界面」右边加一个「检查更新」按钮，
+   *    那个按钮插在中间 → 跨度变长 → 判据误报。
+   *    判据要管的是「说明那句话还在按钮下面」，不该管中间隔了几个字符。
+   */
+  ok('按钮下面还带着说明那句话(不是光秃秃一个按钮)', /dict\.restore,[\s\S]{0,800}dict\.restoreHint/.test(SRC))
+  ok('注释里记着boss原话', /恢复默认放在最上面/.test(SRC))
 }
 
 console.log('')
-console.log(fail === 0 ? `★ ${pass} 项全过(A / C / E 的界面效果未实跑,要作者重启后看)` : `✗ ${fail} 项没过`)
+console.log(fail === 0 ? `★ ${pass} 项全过(A / C / E 的界面效果未实跑,要boss重启后看)` : `✗ ${fail} 项没过`)
 process.exitCode = fail === 0 ? 0 : 1

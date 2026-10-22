@@ -1,0 +1,98 @@
+{
+  "schema": "dsh-skin/release-manifest/v1",
+  "version": "1.8.13",
+  "publishedAt": "2026-10-22T14:29:22.751Z",
+  "notes": "",
+  "files": [
+    {
+      "path": "plugin/index.js",
+      "bytes": 91522,
+      "sha256": "87d29f8fa2808c1da492cc830efc2e3c60805b592db3eb1037793378f111a5e7"
+    },
+    {
+      "path": "plugin/client.js",
+      "bytes": 277116,
+      "sha256": "b2464d9f5e4eda609612f172a307c5eb62ef069593c0a96a6eb59f3d010424f2"
+    },
+    {
+      "path": "plugin/package.json",
+      "bytes": 943,
+      "sha256": "e0f5a667f32db39672475265346d378f66a934d72c4a6f19069b9a5955b4b00c"
+    },
+    {
+      "path": "plugin/cordis.patch.yml",
+      "bytes": 1845,
+      "sha256": "d57a9d70085b50ba61b8653fd80525138e64c489129c3a0673147129f30212cf"
+    },
+    {
+      "path": "plugin/icon.svg",
+      "bytes": 40946,
+      "sha256": "5115ad885e856bf71454ac264644574bc6907e83f3d6d9420c8aeb2b8cbbe5f2"
+    },
+    {
+      "path": "plugin/LICENSE",
+      "bytes": 1066,
+      "sha256": "1fff031e761c391cf29a137a9f99c6a56a7a3b7ea41a56bfa92c5a6c559f2283"
+    },
+    {
+      "path": "plugin/locale/zh.json",
+      "bytes": 239,
+      "sha256": "82461674c5c8920e68508549b3d863607d617cffd7a28880a42cef42a7029d4b"
+    },
+    {
+      "path": "plugin/locale/en.json",
+      "bytes": 214,
+      "sha256": "a89c41da4bf30559360fbcff32e58194099b85f100da1dabf1d065c7925b2fe6"
+    },
+    {
+      "path": "plugin/docs/README.md",
+      "bytes": 815,
+      "sha256": "6dce288d7b0eeb4c4256e5b80e0c77fc78988868cedb07a941a3861fbe93c108"
+    },
+    {
+      "path": "plugin/docs/操作指引.md",
+      "bytes": 13196,
+      "sha256": "2d360d1a50be89b2881f636772f93f31137f65f3e9cbcf3d0cf085d0770f9565"
+    },
+    {
+      "path": "plugin/docs/使用说明.md",
+      "bytes": 8419,
+      "sha256": "c9b8bf8e99014ff3c7f8b9095d82ca2585bb2a265e13e299bce3a6ddf2bb4125"
+    },
+    {
+      "path": "plugin/docs/版本记录.md",
+      "bytes": 96688,
+      "sha256": "df7d1e75d4fee7f67aec77dfd0216a1fb871d75d16dfad9c6fc9a6ccd68ffab1"
+    },
+    {
+      "path": "plugin/docs/踩坑与设计决策.md",
+      "bytes": 63400,
+      "sha256": "668c1a7e426fb6aac0a6897cd815a46b5878462ac3a6495c0cc7a30858cdbeaf"
+    },
+    {
+      "path": "plugin/docs/清单.json",
+      "bytes": 584,
+      "sha256": "e39538746b15c0116a452e9b1bd36739cf4ccc11652b45ad757433c1244062ac"
+    },
+    {
+      "path": "plugin/assets/sounds/ding.mp3",
+      "bytes": 85725,
+      "sha256": "6268acaa082056875fd10b0a957ec475b6b4aaa3dcce34a620777029272cb750"
+    },
+    {
+      "path": "plugin/assets/sounds/dong.mp3",
+      "bytes": 36727,
+      "sha256": "9f78b339a14256412b22ebc7fde1250f3d8f252972af80353ef6126feb669e27"
+    },
+    {
+      "path": "plugin/assets/sounds/coin.mp3",
+      "bytes": 64641,
+      "sha256": "dc33656261dd8e9d5039cd261c46bb34cb99f7a08626149acef1ad6d0cfc5ba0"
+    },
+    {
+      "path": "plugin/assets/sounds/sword-draw.mp3",
+      "bytes": 50103,
+      "sha256": "8e7a389bc883cb5506e3ae441916b2eff2de857217f263edd3057a39e88ca5d0"
+    }
+  ]
+}

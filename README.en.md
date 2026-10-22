@@ -169,7 +169,7 @@ All of it is **local** — none of it is in this repository, and none of it is u
 │   └── docs/                ← bundled docs (same source as §8)
 ├── assets/demo/             ← the 4 screenshots on this page (not part of the install)
 ├── verify/                  ← offline verification scripts (assertions extracted from source)
-├── releases/                ← per-version rollback snapshots + SHA256 file lists
+├── releases/                ← current-version snapshot + SHA256 file list + CHANGELOG
 ├── LICENSE                  ← MIT
 ├── README.md                ← Chinese
 └── README.en.md             ← this file
@@ -214,6 +214,12 @@ node verify/version_check.cjs      # package version ↔ snapshot hashes ↔ UI 
 
 The 4 bundled sounds in `plugin/assets/sounds/` (a ding, a double-bump, a coin drop, a sword-draw) are **simple synthesised/recorded notification tones, included for demonstration and personal use only** — none of them is a third-party branded audio clip. If you plan to use this repository commercially or redistribute it, replace these files with your own.
 
-**About the version snapshots (`releases/`)**: the per-version rollback snapshots are kept here. **v1.5.2 – v1.5.5 used to ship 5 recognisable branded sounds** (the ones named after CS / QQ). **From v1.6.0 this repository no longer distributes them** — those snapshots **no longer contain** the audio files, and each snapshot's file manifest records it with a "(N branded sounds, removed)" row. The sound files still present in the snapshots are the unbranded ones.
+**About the version snapshots (`releases/`)**: the **current version's** rollback snapshot is kept here (with a `文件清单.md` file manifest carrying SHA-256 hashes, so you can confirm "the version I installed is this one"), together with `CHANGELOG.md` (the full record of what changed in every version — also readable in `plugin/docs/版本记录.md`).
+
+The snapshots of earlier versions are still in the repository from when they were first published, kept for reference — but **no new ones are added**: from now on a release only adds the current version's snapshot.
+
+Early versions (v1.5.2 – v1.5.5) used to ship 5 recognisable branded sounds (the ones named after CS / QQ). **From v1.6.0 this repository no longer distributes them** — the snapshot **no longer contains** those audio files.
+
+> The complete version history is in `plugin/docs/版本记录.md` — not a single entry is missing. To look back at a specific version, see the changelog entries.
 
 The plugin's own code and documentation are licensed under [MIT](LICENSE).

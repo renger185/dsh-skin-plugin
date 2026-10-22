@@ -30,6 +30,29 @@ window.__ModuleLoader__.load({
     const BELL_PATH = new URL('dsh-skin/bell', base).pathname
     const SOUNDS_PATH = new URL('dsh-skin/sounds', base).pathname
     const SOUND_PATH = new URL('dsh-skin/sound', base).pathname
+    /**
+     * 彩蛋：渠道限流贴纸的数据源（主机端那个接口）。
+     * 【2026-10-20 boss】界面上一个说明字都不给，但代码在。
+     * 交互：单击悬浮球 3 次浮现，再单击 3 次关闭；贴纸右上角有个「叉」可直接关。
+     */
+    const CHANNEL_LIMITS_PATH = new URL('dsh-skin/channel-limits', base).pathname
+    /**
+     * 【10-22 08:0x boss选 B】更新检查接口（主机端去问远端仓库版本）。
+     * boss问「别人下载了 GitHub 上的插件，我们更新之后他会收到升级通知吗」——
+     * 答案是不会（详见主机端那段注释），所以这里自己做提示。
+     */
+    const UPDATE_CHECK_PATH = new URL('dsh-skin/update-check', base).pathname
+    /** 推荐项目（boss自己的项目）—— 取 Star / Fork / 最近提交的真数字 */
+    const PROJECTS_PATH = new URL('dsh-skin/projects', base).pathname
+    /**
+     * 【10-22 09:0x boss】自动更新的三步（界面各一个按钮，绝不合并成一个"一键更新"）：
+     *   ① update-manifest 读远端清单
+     *   ② update-download **只下载到旁边**，不动现装的那份
+     *   ③ update-apply    **您点了确认才替换**（先备份，失败自动回滚）
+     */
+    const UPDATE_MANIFEST_PATH = new URL('dsh-skin/update-manifest', base).pathname
+    const UPDATE_DOWNLOAD_PATH = new URL('dsh-skin/update-download', base).pathname
+    const UPDATE_APPLY_PATH = new URL('dsh-skin/update-apply', base).pathname
     const SOURCE = 'dsh-skin:appearance' // 覆盖层身份同一个source 只会有一层
     const PANEL_WIDTH = 460 // 浮窗面板宽度上限,实际宽度还要看屏幕放不放得下
     const PANEL_GAP = 12 // 面板和圆钮之间留的空
@@ -43,28 +66,28 @@ window.__ModuleLoader__.load({
     const THUMB_MAX_EDGE = 256 // 缩略图长边
     const THUMB_QUALITY = 0.75
     const LUMA_THRESHOLD = 128 // 平均亮度分界:0-255  128,，0.50(skill 原值
-    // 遮罩基准整体压低(作者 10-18 01:07 / 01:20 两轮实测):
+    // 遮罩基准整体压低(boss 10-18 01:07 / 01:20 两轮实测):
     //   浅色 25% 就盖掉背景、深色图 40% 就发白—两档都往下收，
-    // 遮罩越高 = 主题底色盖得越实 = 背景图越淡。作者要的是「看得见图，所以全部往下收。
+    // 遮罩越高 = 主题底色盖得越实 = 背景图越淡。boss要的是「看得见图，所以全部往下收。
     const AUTO_MASK_DARK = 12
     const AUTO_MASK_LIGHT = 6
-    // 滑杆上限 40（作者 10-19 19:2x：「透明度你应该调整到 0~40%」）
+    // 滑杆上限 40（boss 10-19 19:2x：「透明度你应该调整到 0~40%」）
     // 【跟主机端必须一致】index.js 里还有一道写盘前的夹取（MAX_WASH）——
     // 两边不一致的话，滑杆能拖到 40、存进去却被悄悄夹回 25，拖完自己弹回去。
     // `verify/mode_wash_check.cjs` 有一条判据专门盯这两处不许漂。
     const MAX_WASH = 40
-    // 专注模式:压实档。5 太白 → 45 作者仍嫌高 → 28 → 【10-19 19:5x 作者定 35】
+    // 专注模式:压实档。5 太白 → 45 boss仍嫌高 → 28 → 【10-19 19:5x boss定 35】
     const FOCUS_MASK = 35
-    // 休闲:几乎不盖,图最大程度露出来。【10-19 19:5x 作者定 5】(原来 3)
+    // 休闲:几乎不盖,图最大程度露出来。【10-19 19:5x boss定 5】(原来 3)
     const LEISURE_MASK = 5
 
     /**
-     * ═══ 判黑白字:作者 10-18 21:30 亲口定的三档口径 ═══
+     * ═══ 判黑白字:boss 10-18 21:30 亲口定的三档口径 ═══
      *
      * 原话(21:30):「明度低于 10 用白字,明度高于 15 用黑字,
      * 介于这中间:黑白都可以,或者用默认的。」
      *
-     * 原来只有一个分界点 0.18,低于它全判白字。作者嫌粗。
+     * 原来只有一个分界点 0.18,低于它全判白字。boss嫌粗。
      * 【为什么这么改是有数的】1387 张全扫过:按 0.18 判有 371 张(26.7%)走白字,
      * 而其中 109 张整图明度其实在 0.15~0.18 之间——那不是暗图,是被误判的。
      * 收紧成三档之后白字只剩 115 张(8.3%),这一档实测 98% 的图用白字明显更好。
@@ -73,12 +96,12 @@ window.__ModuleLoader__.load({
     const INK_WHITE_MAX = 0.1 // 低于这个亮度 → 白字
     const INK_BLACK_MIN = 0.15 // 高于这个亮度 → 黑字
     /**
-     * 【10-18 22:15 作者给的切块判据】一个方块的平均亮度低于 CELL_DARK_MAX 算「黑块」,
+     * 【10-18 22:15 boss给的切块判据】一个方块的平均亮度低于 CELL_DARK_MAX 算「黑块」,
      * 高于 CELL_LIGHT_MIN 算「白块」,中间的是灰块。
      *
      * 【22:22 定档】用 sRGB 感知亮度(0-1):0.35 是「人眼看着明显暗」,0.65 是「明显亮」。
-     * 中间那一大片就是作者说的灰。
-     * 【22:20 走过一段弯路】第一版用 WCAG 相对亮度 + 0.05/0.35,拿作者那两张夜景实测
+     * 中间那一大片就是boss说的灰。
+     * 【22:20 走过一段弯路】第一版用 WCAG 相对亮度 + 0.05/0.35,拿boss那两张夜景实测
      * **暗块占比 0%**,79%~90% 全掉进灰块 —— WCAG 那个尺度是给算对比度用的,
      * 它把中暗色调得太亮,人眼看夜景的深蓝天空明明就是黑的,它却算成中间色。
      */
@@ -90,25 +113,25 @@ window.__ModuleLoader__.load({
      */
     const CELL_SHARE_EDGE = 0.05
     /**
-     * ═══ 自动垫底:作者 10-18 21:40 定的「一起都改」 ═══
+     * ═══ 自动垫底:boss 10-18 21:40 定的「一起都改」 ═══
      *
-     * 【作者报的坑,原话】「图片偏黑灰,你的文字也是黑的,基本上看不太清。
+     * 【boss报的坑,原话】「图片偏黑灰,你的文字也是黑的,基本上看不太清。
      * 这时候透明度就只有 12%,如果再低基本上就看不到文字了。」
      *
      * 拿他那张车库图实测过(2026-10-18 21:26):
      *   透明度 0% → 黑字最差 1.50:1   6% → 3.00:1   12% → 4.51:1
-     * 也就是说 12% 就是这张图的下限,作者的手感一分不差。
+     * 也就是说 12% 就是这张图的下限,boss的手感一分不差。
      * 以前这个 12% 要他自己拖,而且拖下去就看不清了 —— 滑杆能往下走,没有底。
      * 现在改成:每张图算一条**自动底线**,滑杆拖不下去,系统先保它看得清。
      *
      * 【为什么封顶 20%】实测全库要垫多少:保到一半的图达到 3:1 平均要垫 12%,
      * 保到 4.5:1 要垫 21%,个别图能要 40%。垫到 40% 等于把壁纸洗成白墙,
-     * 正是作者 19:05 骂过的「发雾」。所以封顶 20%:该垫的垫,不许把图洗没。
+     * 正是boss 19:05 骂过的「发雾」。所以封顶 20%:该垫的垫,不许把图洗没。
      */
     const AUTO_FLOOR_TARGET = 3 // 底线要保到的对比度(WCAG 对大字/图标的线)
-    const AUTO_FLOOR_CAP = 20 // 底线封顶(作者 10-18 21:40 定的)
+    const AUTO_FLOOR_CAP = 20 // 底线封顶(boss 10-18 21:40 定的)
     const PORTRAIT_BLEED = 1.2 // 竖图模糊填充时向外多铺的比例(skill 原值
-    // 图库分页:作者库里 600 多张，一次性渲染600 个缩略图会把整个界面拖死
+    // 图库分页:boss库里 600 多张，一次性渲染600 个缩略图会把整个界面拖死
     // (换张图要十几秒。一次只 60  点「加载更多」再下一批。
     const PAGE_SIZE = 60
 
@@ -232,6 +255,35 @@ window.__ModuleLoader__.load({
         portraitHint: '竖图直接铺满会被放大裁掉,「居中」是完整显示(老版本就是这个)。',
         rotateNeedMore: '自动换肤:库里至少要有 2 张图',
         pickRandom: '换一张',
+        // 【10-22 20:1x boss】「换一张」→「下一张」（按图库顺序走，不随机）
+        pickNext: '下一张',
+        wallToDefault: '已切回系统默认壁纸',
+        wallToDefaultPaused: '已切回系统默认壁纸 · 自动换肤已暂停',
+        updateAvailable: '有新版本',
+        updateWindowTitle: '检查更新',
+        updateSection: '插件升级',
+        updateSectionHint: '点「检查更新」只查版本，不会自动替换。想更新请到仓库页下载后覆盖，重启桌面端生效。',
+        updateCurrent: '当前版本',
+        updateLatest: '最新版本',
+        updateOutdated: '有新版本',
+        updateUpToDate: '已是最新版本',
+        updateCheck: '检查更新',
+        updateChecking: '正在检查…',
+        updateGoRepo: '去仓库页',
+        updateDownload: '下载更新（不替换）',
+        updateDownloading: '正在下载…',
+        updateDownloadedHint: '已下载好 {n} 个文件，放在暂存目录里，现装的那份还没动。点下面的按钮才会替换；替换前会自动备份，替换后需要重启桌面端才生效。',
+        updateInstall: '点此安装（替换现有文件）',
+        updateInstalling: '正在替换…',
+        updateAppliedHint: '已替换成新版本。请重启桌面端（托盘右键 → 退出 → 再打开）才生效。旧版本已自动备份在插件数据目录里，坏了可以还原。',
+        updateFailed: '没成功',
+        projectsSection: '我的项目',
+        projectsSectionHint: '同一作者的其他插件。数字是仓库的真实 Star / Fork，取不到就不显示。',
+        projectsEmpty: '暂时没有可显示的项目',
+        projectsOpen: '打开',
+        projectsUpdated: '最近更新',
+        wallToCustom: '已切回自定义背景',
+        wallNoImage: '图库是空的,先加一张图',
         bleedLabel: '两侧模糊过渡',
         bleedValue: '{n}px',
         bleedOff: '不要这层',
@@ -308,6 +360,35 @@ window.__ModuleLoader__.load({
         portraitHint: 'Filling a portrait image zooms and crops it; Centered shows it whole (the original behaviour).',
         rotateNeedMore: 'Auto skin: needs at least 2 images in the library',
         pickRandom: 'Pick another',
+        // 【10-22 20:1x boss】「换一张」→「下一张」（按图库顺序走，不随机）
+        pickNext: 'Next image',
+        wallToDefault: 'Back to the default wallpaper',
+        wallToDefaultPaused: 'Back to the default wallpaper · auto skin paused',
+        updateAvailable: 'Update available',
+        updateWindowTitle: 'Check for updates',
+        updateSection: 'Plugin upgrade',
+        updateSectionHint: '“Check” only looks up the version — it never replaces anything. To update, download from the repository and overwrite, then restart the desktop app.',
+        updateCurrent: 'Current',
+        updateLatest: 'Latest',
+        updateOutdated: 'Update available',
+        updateUpToDate: 'Already up to date',
+        updateCheck: 'Check for updates',
+        updateChecking: 'Checking…',
+        updateGoRepo: 'Open repository',
+        updateDownload: 'Download update (does not replace)',
+        updateDownloading: 'Downloading…',
+        updateDownloadedHint: 'Downloaded {n} files into a staging folder — the installed copy is untouched. The button below performs the replacement; the old version is backed up first, and a restart is needed afterwards.',
+        updateInstall: 'Install now (replace the installed files)',
+        updateInstalling: 'Replacing…',
+        updateAppliedHint: 'The files have been replaced. Restart the desktop app (tray icon → Quit → reopen) to make it take effect. The previous version was backed up in the plugin data folder.',
+        updateFailed: 'Did not succeed',
+        projectsSection: 'My projects',
+        projectsSectionHint: "Other plugins by the same author. The numbers are the repository's real Stars / Forks; they are hidden when they cannot be read.",
+        projectsEmpty: 'No projects to show yet',
+        projectsOpen: 'Open',
+        projectsUpdated: 'Updated',
+        wallToCustom: 'Back to your own background',
+        wallNoImage: 'The gallery is empty, add an image first',
         bleedLabel: 'Blurred transition on the sides',
         bleedValue: '{n}px',
         bleedOff: 'Off',
@@ -363,7 +444,7 @@ window.__ModuleLoader__.load({
       danger: 'var(--dsw-alias-state-error-primary)',
     }
 
-    // 弹窗底色浓度:50%-100%,95% 是默认值(作者 10-18 11:20 定的「别太透」)。
+    // 弹窗底色浓度:50%-100%,95% 是默认值(boss 10-18 11:20 定的「别太透」)。
     // 【这三行必须放在 state 之前】state 的初始值要用 POPUP_ALPHA_DEFAULT。
     // 之前它们定义在 state 后面,模块一加载就抛
     // "Cannot access 'POPUP_ALPHA_DEFAULT' before initialization",
@@ -377,18 +458,18 @@ window.__ModuleLoader__.load({
     // 【10-19 21:1x】lang = 面板语言，'zh'（默认）或 'en'
     // 【10-19 21:4x】onboarded = 新手引导看过没有。**默认 false** —— 第一次装的人
     //   打开面板会自己跳出来（见 Launcher 里那两段 useEffect + SkinControls 的引导卡）。
-    let state = { activeId: '', wash: null, text: 'follow', mode: 'normal', rotateMinutes: 0, popupAlpha: POPUP_ALPHA_DEFAULT, ballX: null, ballY: null, bleed: 64, soundOn: false, soundVolume: 0.5, soundId: '', lang: 'zh', onboarded: false }
+    let state = { activeId: '', wash: null, text: 'follow', mode: 'normal', rotateMinutes: 0, popupAlpha: POPUP_ALPHA_DEFAULT, ballX: null, ballY: null, bleed: 64, soundOn: false, soundVolume: 0.5, soundId: '', lang: 'zh', onboarded: false, lastWallId: '' }
     // 设置从主机端读回来了没有 —— 新手引导要等它回来再决定跳不跳（否则老用户也会被弹一次）
     let stateReady = false
     /**
-     * ═══ 提示音(作者 10-18 23:45 选 A,10-19 00:20 加自定义)═══
+     * ═══ 提示音(boss 10-18 23:45 选 A,10-19 00:20 加自定义)═══
      * 开关、音量、选中的音效 id 都存换肤设置里,跟着别的设置一起落盘。
-     * 作者明确要「默认关」—— 这版刚稳,先别吵。
+     * boss明确要「默认关」—— 这版刚稳,先别吵。
      */
     const SOUND_ON_DEFAULT = false
     const SOUND_VOLUME_DEFAULT = 0.5
     /**
-     * ═══ 音效的容量天花板(作者 10-19 13:55 选的 B 案:单个 8MB / 总量 200MB / 最多 30 条)═══
+     * ═══ 音效的容量天花板(boss 10-19 13:55 选的 B 案:单个 8MB / 总量 200MB / 最多 30 条)═══
      *
      * 【这两份数为什么有两处】主机端才是权威(它在写盘前拦),这里这份只是
      * 「点下去立刻能给反馈」的预判,以及主机端没回话时的兜底。
@@ -411,7 +492,7 @@ window.__ModuleLoader__.load({
     /**
      * ═══ 「需要人工判断」时也响一声（10-20 00:0x 第二版；第一版在真机上收不到）═══
      *
-     * 作者原话：「当出现需要人工判断的时候，也需要加提示音。」
+     * boss原话：「当出现需要人工判断的时候，也需要加提示音。」
      *
      * 【第一版为什么不行】一开始我在**主机端**听 `approval/asked`（落地会话事件）
      * 和 `user-questions/request`（waterfall）。重启后真机实测：`bell.at` 一直是 0、
@@ -520,7 +601,7 @@ window.__ModuleLoader__.load({
     /**
      * 面板用哪套文案（中文 / English）。
      *
-     * 【10-19 21:1x 作者】「在悬浮球的选项里面，写一个中英双语版，默认是中文，
+     * 【10-19 21:1x boss】「在悬浮球的选项里面，写一个中英双语版，默认是中文，
      * 中英双语文字放在最置顶的位置，可以一键切换」
      *
      * 规则：**面板上的选择优先**（state.lang，默认 'zh'），没选过才跟随应用语言。
@@ -547,7 +628,7 @@ window.__ModuleLoader__.load({
     const clamp01 = (n) => clamp(Number(n) || 0, 0, 1)
 
     /**
-     * 面板往哪边展开(作者 10-18 11:02 提的:靠近哪条边就朝反方向开)。
+     * 面板往哪边展开(boss 10-18 11:02 提的:靠近哪条边就朝反方向开)。
      *
      * 之前只有「向左向右」一个开关上下写死贴着圆钮往上开(样式里写死bottom:68px),
      * 圆钮拖到屏幕顶部时面板整个跑到屏幕外头去，看着就是「没反应」。
@@ -555,7 +636,7 @@ window.__ModuleLoader__.load({
      * 再把面板拉回屏幕内。
      *
      * 返回的是**相对圆钮容器**的坐标面板是圆钮那个fixed 盒子的绝对定位子元素),
-     * 这样作者拖圆钮的时候面板跟着一起走。
+     * 这样boss拖圆钮的时候面板跟着一起走。
      */
     function computePanelPlacement(rect) {
       const vw = Math.max(window.innerWidth || 0, 320)
@@ -596,34 +677,34 @@ window.__ModuleLoader__.load({
     /**
      * 当前实际生效的遮罩百分比：模式强制值 > 每张图手调值 > 图片自动基准，再被「自动底线」托住。
      *
-     * ═══ 【10-19 18:5x 作者打回：三个模式用不了了】═══
+     * ═══ 【10-19 18:5x boss打回：三个模式用不了了】═══
      *
-     * 作者原话:「你把图片背景的明度、透明度给删掉了,这个版本没有了。你应该加上去的,
+     * boss原话:「你把图片背景的明度、透明度给删掉了,这个版本没有了。你应该加上去的,
      * 要不然我们『休闲』『专注』和『正常』这三个模式都用不了了。」
      *
-     * 【我上次错在哪】00:56 作者说「我要的是背景最清晰的,你不要给我加什么遮罩」——
+     * 【我上次错在哪】00:56 boss说「我要的是背景最清晰的,你不要给我加什么遮罩」——
      * 我把它理解成「整栏删掉、wash 一律按 0」，于是：
      *   · 三个模式的值没人读了（effectiveWash 里写死 0）→ 模式只剩一句提示文字，
-     *     点了「专注」和「正常」屏幕上一模一样 —— 作者说的「用不了了」就是这个；
+     *     点了「专注」和「正常」屏幕上一模一样 —— boss说的「用不了了」就是这个；
      *   · 面板上还留着「按每张图自己的亮度配遮罩,你能再手调」这种**假话**（手调已经没了）。
      * **删控件不能顺手把它的语义也删掉** —— 模式的定义就是「遮罩档位」，档位没了模式自然废。
      *
      * 【现在】模式的值重新生效；普通档把滑杆还回去（界面在 SkinControls 那一栏）。
      * 唯一保留 00:56 那条意见的地方：**不手调时不再偷偷垫雾**（老存档的 wash=null 仍走
      * 每张图自己的基准 autoMask，而不是无脑加一层），而且那句「遮罩 0=背景最清楚」的
-     * 长提示和「按图片自动」按钮都不恢复 —— 那两句是作者点名不要的。
+     * 长提示和「按图片自动」按钮都不恢复 —— 那两句是boss点名不要的。
      *
-     * ═══ 【10-19 20:2x 作者：「我不是让你把透明度调到 0~40% 吗？为什么是从 9 开始的」】═══
+     * ═══ 【10-19 20:2x boss：「我不是让你把透明度调到 0~40% 吗？为什么是从 9 开始的」】═══
      *
      * 那个 9 是「自动底线」—— 每张图按它最糟的那块地方算出来的「字会看不清的下限」，
-     * 10-18 21:40 作者点头过的（原话「一起都改」）。当时它是**硬挡**：既当滑杆左端，
+     * 10-18 21:40 boss点头过的（原话「一起都改」）。当时它是**硬挡**：既当滑杆左端，
      * 又在 effectiveWash 里再把数值抬上去。于是滑杆写着 0~40，实际左端顶在 9 上，
-     * 拖到底也不是 0 —— 作者要的「0~40」根本没落地。
+     * 拖到底也不是 0 —— boss要的「0~40」根本没落地。
      *
      * 【现在】底线**只当中文提示，不再改数值**：滑杆真能从 0 拖起，
      * 拖到几就是几（0 就是 0，图原样透出来）；那条建议值写在滑杆下面一行小字里。
-     * 字会不会糊，交给黑白字判定 + 文字光晕兜 —— 实在糊了往右拖两格，那是作者自己的手。
-     * **「防呆」和「作者要的区间」冲突时，按作者的话办，但要把他失去的那层保护说出来。**
+     * 字会不会糊，交给黑白字判定 + 文字光晕兜 —— 实在糊了往右拖两格，那是boss自己的手。
+     * **「防呆」和「boss要的区间」冲突时，按boss的话办，但要把他失去的那层保护说出来。**
      */
     function effectiveWash(entry) {
       if (state.mode === 'focus') {
@@ -635,7 +716,7 @@ window.__ModuleLoader__.load({
       /**
        * 【10-19 19:0x 单元测试抓出来的坑】原来是 `Number.isFinite(Number(state.wash))`
        * 判「有没有手调过」—— 可 `Number(null)` 就是 0，而 0 是有限数！
-       * 于是老存档里的 wash=null（从没拖过滑杆）会被当成「作者手动调到了 0」，
+       * 于是老存档里的 wash=null（从没拖过滑杆）会被当成「boss手动调到了 0」，
        * 正常档永远走不到「每张图自己的基准」那条路 → 三个档里最中庸的那档直接躺平。
        * 现在按 null / 非数字分开判。**判「有没有值」不能拿数字函数当尺子。**
        */
@@ -731,7 +812,7 @@ window.__ModuleLoader__.load({
       try {
         state = normalizeState(await postJson(STATE_PATH, { method: 'set', patch }))
       } catch {
-        /* 存不进去就先在内存里生效,不打断作者操作 */
+        /* 存不进去就先在内存里生效,不打断boss操作 */
       }
     }
 
@@ -745,15 +826,15 @@ window.__ModuleLoader__.load({
       const src = input && typeof input === 'object' ? input : {}
       const mode = ['normal', 'focus', 'leisure'].includes(src.mode) ? src.mode : 'normal'
       // 【10-18 19:20】老存档里可能还留着 'auto'(按图主色判黑白的那一档,19:05 已删)。
-      // 【10-18 22:05】'dark' / 'light' 也一起并进 'follow' —— 作者原话「悬浮窗里就不要有选项了,
+      // 【10-18 22:05】'dark' / 'light' 也一起并进 'follow' —— boss原话「悬浮窗里就不要有选项了,
       // 直接删掉」「你图片判断默认是深色字体,开进来就应该是深色字体」。
-      // 按钮没了还留着手动值的话,作者就再也退不出那一档了,所以这里一并归到自动。
+      // 按钮没了还留着手动值的话,boss就再也退不出那一档了,所以这里一并归到自动。
       const rawText = ['auto', 'dark', 'light'].includes(src.text) ? 'follow' : src.text
       const text = ['follow', 'dark', 'light'].includes(rawText) ? rawText : 'follow'
       const wash = src.wash === null || src.wash === undefined ? null : clamp(Math.round(Number(src.wash) || 0), 0, 100)
       /**
        * 【10-18 20:45 新增两样】
-       *   ballX/ballY —— 悬浮球拖到哪,记到哪。作者原来每次重开桌面端都被弹回右下角。
+       *   ballX/ballY —— 悬浮球拖到哪,记到哪。boss原来每次重开桌面端都被弹回右下角。
        *   bleed       —— 竖图两侧那层模糊过渡的半径(px),0 = 干脆不要这层,两侧留干净。
        */
       const spot = (v) => (Number.isFinite(Number(v)) ? Math.round(Number(v)) : null)
@@ -766,11 +847,18 @@ window.__ModuleLoader__.load({
       const soundVolume = Number.isFinite(vol) ? clamp(vol, 0, 1) : SOUND_VOLUME_DEFAULT
       // 选中的音效:空串 = 用内置那声「叮」;否则是自定义音效的 id
       const soundId = typeof src.soundId === 'string' ? src.soundId : ''
-      // 【10-19 21:1x】面板语言:只认 'zh' / 'en',坏值/老存档一律回中文(作者要的默认)
+      // 【10-19 21:1x】面板语言:只认 'zh' / 'en',坏值/老存档一律回中文(boss要的默认)
       const lang = src.lang === 'en' ? 'en' : 'zh'
       // 【10-19 21:4x】新手引导看过没有:只有明确 true 才算看过 —— 老存档没这字段 → 当作没看过
       const onboarded = src.onboarded === true
-      return { activeId: typeof src.activeId === 'string' ? src.activeId : '', wash, text, mode, rotateMinutes: normalizeRotate(src.rotateMinutes), popupAlpha: normalizePopupAlpha(src.popupAlpha), ballX, ballY, bleed, soundOn, soundVolume, soundId, lang, onboarded }
+      /**
+       * 【10-22 00:3x】**`lastWallId` 必须在这里带上**：
+       *   这个函数每规范化一次就**整个换掉 state 对象**，
+       *   漏一个字段就等于「每次规范化把它抹掉」——双击右键切回上次那张就会失效，
+       *   而且看起来像"功能有时灵有时不灵"（取决于中途有没有走过 normalizeState）。
+       */
+      const lastWallId = typeof src.lastWallId === 'string' ? src.lastWallId : ''
+      return { activeId: typeof src.activeId === 'string' ? src.activeId : '', wash, text, mode, rotateMinutes: normalizeRotate(src.rotateMinutes), popupAlpha: normalizePopupAlpha(src.popupAlpha), ballX, ballY, bleed, soundOn, soundVolume, soundId, lang, onboarded, lastWallId }
     }
 
     // 弹窗底色浓度的三个档位常量已挪到上面 state 之前(那里要用)。
@@ -783,17 +871,17 @@ window.__ModuleLoader__.load({
     }
 
     // ── 背景图片随机变换时间 ──────────────────────────────
-    // 作者 10-18 11:02 点的:每隔一段时间自己换一张背景图。
+    // boss 10-18 11:02 点的:每隔一段时间自己换一张背景图。
     // 0 = 不换;正数 = 分钟(留小数是给秒级自测用。。上限14400 分钟(10 天 
     const ROTATE_PRESETS = [1, 3, 5, 10, 30]
     const ROTATE_MAX = 14400
     /**
-     * 最小轮换间隔(分钟)。作者能选的最小档是 1 分钟。
+     * 最小轮换间隔(分钟)。boss能选的最小档是 1 分钟。
      *
      * 【10-18 15:45 加这道闸】自检曾经会把 rotateMinutes 临时设成 0.02(1.2 秒),
      * 一旦还原失败就永久留在磁盘上,表现为「背景一直自己换」。
      * 那个测试已经删了,这里再加一道:小于 1 分钟的值一律当「不换」。
-     * 作者真正会用到的档位是 1/3/5/10/30 分钟,不存在 1 分钟以下的合法值。
+     * boss真正会用到的档位是 1/3/5/10/30 分钟,不存在 1 分钟以下的合法值。
      */
     const ROTATE_MIN = 1
 
@@ -837,13 +925,13 @@ window.__ModuleLoader__.load({
       const chatY1 = Math.max(chatY0 + 1, Math.floor(height * 0.85))
       const chatLums = []
       /**
-       * 【10-18 22:15 作者亲口给的判据,取代「整图平均亮度」】
+       * 【10-18 22:15 boss亲口给的判据,取代「整图平均亮度」】
        * 原话:「每张图片你都可以把它切割成小方块,计算它当下的黑白明度占比,
        * 或者是灰色的占比,然后你就能匹配相应的文字呀。
        * 黑的占多的不就用白的吗?白的占多的不就用黑的吗?」
        *
        * 为什么比平均亮度对:夜景图一半是黑天空一半是亮楼,平均下来是"中间",
-       * 按中间判就配了黑字,压到黑天空上直接糊。作者给的两张夜景截图就是这个毛病。
+       * 按中间判就配了黑字,压到黑天空上直接糊。boss给的两张夜景截图就是这个毛病。
        * 切块统计比的是**面积** —— 哪边占的地方多,字就用另一边那个颜色。
        *
        * 12×12 = 144 块:太小一块亮窗户就能翻转结论,太大又跟平均没区别。
@@ -898,15 +986,15 @@ window.__ModuleLoader__.load({
       chatLums.sort((a, b) => a - b)
       const at = (q) => (chatLums.length ? chatLums[clamp(Math.floor(chatLums.length * q), 0, chatLums.length - 1)] : avgLum)
       /**
-       * 切块统计(作者 22:15 的判据):每块取平均亮度,分成 黑/灰/白 三档,数各占多少。
+       * 切块统计(boss 22:15 的判据):每块取平均亮度,分成 黑/灰/白 三档,数各占多少。
        *
        * 【22:22 换成 sRGB 感知亮度,不再用 WCAG 相对亮度】
-       * 第一版用 WCAG 线性亮度 + 0.05 的黑块界,拿作者那两张夜景实测:**暗块 0%**,
+       * 第一版用 WCAG 线性亮度 + 0.05 的黑块界,拿boss那两张夜景实测:**暗块 0%**,
        * 79%~90% 全掉进灰块,还是判黑字。
        * 根因:WCAG 那个尺度是给算对比度用的,它把中暗色调得很亮;
        * 人眼看夜景的深蓝天空就是「黑的」,不需要那么严格。
        * 所以这里回到人眼直觉的亮度(sRGB 加权,0-1),黑块界 0.35 / 白块界 0.65,
-       * 也就是「看着明显暗」和「看着明显亮」,中间那一大片就是作者说的灰。
+       * 也就是「看着明显暗」和「看着明显亮」,中间那一大片就是boss说的灰。
        */
       let darkCells = 0
       let lightCells = 0
@@ -1063,7 +1151,7 @@ window.__ModuleLoader__.load({
         w: full.width,
         h: full.height,
         portrait,
-        // 竖图默认「原图」(作者 10-18 15:50 定的):按原图像素显示,不放大铺满。
+        // 竖图默认「原图」(boss 10-18 15:50 定的):按原图像素显示,不放大铺满。
         fillMode: portrait ? 'native' : 'cover',
         avgLum: Math.round(analysis.avgLum),
         brightness: Number(analysis.brightness.toFixed(4)),
@@ -1108,7 +1196,7 @@ window.__ModuleLoader__.load({
       // 图库张数变了,随机变换的排期得跟着重排(原来只有一张图是不排期。
       scheduleRotate()
       // 第一次导入图库本来是空的直接把这张设成当前背景
-      // 不然作者传完图看着什么都没发生。之后导入不再自动，—skill 一个做跟
+      // 不然boss传完图看着什么都没发生。之后导入不再自动，—skill 一个做跟
       if (added > 0 && !currentEntry() && library.length > 0) {
         await selectImage(library[library.length - 1].id)
         return
@@ -1153,7 +1241,7 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * 老版本把背景图整张塞进state.json 里作者 10-18 凌晨已经传过一次 
+     * 老版本把背景图整张塞进state.json 里boss 10-18 凌晨已经传过一次 
      * 这里把它捞出来走正常入库流程 ——存好了才让主机端把老数据擦掉。
      */
     async function migrateLegacy() {
@@ -1256,7 +1344,7 @@ window.__ModuleLoader__.load({
 
     // ── 背景与主题叠加层 ──────────────────────────────────
     /**
-     * 反差色两套(作者 10-18 15:50 定的方案)。
+     * 反差色两套(boss 10-18 15:50 定的方案)。
      *
      * 不再是"调一个灰色去适配",而是明确的二选一:
      *   底子暗 → LIGHT_INK(白字)
@@ -1266,9 +1354,9 @@ window.__ModuleLoader__.load({
      * 实测 66 组状态字掉到 2.92:1(要 3)。图标和「进行中」这种小字不能太淡,
      * 现在把不透明度提到 0.88 以上,层次改由字号/字重承担,不靠牺牲可见度。
      *
-     * 【10-18 22:05 作者】「这两者的文字明度都相对要高一点」
+     * 【10-18 22:05 boss】「这两者的文字明度都相对要高一点」
      * 【10-18 22:05 第二轮纠正】「我让你用黑的跟白的两种字体,没让你用灰色的」
-     * —— 上一版把深色字提成了 #2b2e33(深灰),作者看到的是灰字,打回。
+     * —— 上一版把深色字提成了 #2b2e33(深灰),boss看到的是灰字,打回。
      * 现在仍然是黑,只是比死黑亮一点点(#0b0c0f → #1a1c20),看着还是黑。
      * 浅色字本来就是纯白,那四档半透的抬一点是让次要文字更清楚,色相没动。
      */
@@ -1297,23 +1385,23 @@ window.__ModuleLoader__.load({
     //   floor = 这一层的最低不透明度——承载文字的面板不许透到字都看不清
     //
     // floor 是防「白块+ 字看不见」的保底。
-    // 【重要修正10-18 01:07】原来的 0.6 / 0.82 太高，——作者实测「浅色图 25%。
+    // 【重要修正10-18 01:07】原来的 0.6 / 0.82 太高，——boss实测「浅色图 25%。
     // 深色图40% 背景就不清楚了，根因正是这个保底把背景图盖死，滑杆拉到 0 也救不回来。
     //
     // 【10-18 19:05 再修一次:0.18 → 0.06】
-    // 作者报「横向的壁纸看着不清晰,透明度拉到 0 还是模模糊糊一层」。
+    // boss报「横向的壁纸看着不清晰,透明度拉到 0 还是模模糊糊一层」。
     // 先查了应用自己的毛玻璃钩子:设置页那层模糊(mask)只在弹窗打开时挂上,
     // 不压壁纸 —— 所以雾不是它造成的,是我这行保底。
-    // 0.18 的意思是:哪怕作者把滑杆拉到 0,聊天区和侧栏上也永远压着一层 18% 的白,
+    // 0.18 的意思是:哪怕boss把滑杆拉到 0,聊天区和侧栏上也永远压着一层 18% 的白,
     // 两层叠一块(侧栏 + 主面板)能到 30% 以上,看着就是一层奶雾。
     // 现在保底只留 0.06 —— 滑杆拉到 0 就真的是"原图透出来",字看得清交给反差色兜底
     // (下面 fixIfBlind 会把对比度顶到 3:1 以上)。
     const BASE_LAYER = '--dsw-alias-bg-base'
     const PANEL_LAYER = '--dsw-alias-bg-layer-1'
     const PANEL_FLOOR = 0.06
-    // 弹窗/下拉的底色浓度。作者 10-18 11:20 提的:换肤之后界面本来就半透
+    // 弹窗/下拉的底色浓度。boss 10-18 11:20 提的:换肤之后界面本来就半透
     // 下拉框自己那层底色再半透一点两层的图叠一块里面的字就糊了看不清。
-    // 这里给它一个保底浓度并且让作者能自己调 ——调低就恢复原来半透的样子。
+    // 这里给它一个保底浓度并且让boss能自己调 ——调低就恢复原来半透的样子。
     // 下拉框是浮在界面上面的小盒子,加实它不会挡住背后的背景图。
     // 档位和默认值见 normalizePopupAlpha / POPUP_ALPHA_*。
     const SURFACE_LAYERS = [
@@ -1325,8 +1413,8 @@ window.__ModuleLoader__.load({
       // 之前插件只洗上面几枚,下面这些全是主题自带的实色。换肤后界面半透,
       // 它们就成了突兀的实块,而且压在它们上面的字是插件按半透底算的,色对不上就糊。
       //
-      // 【10-18 15:45】菜单/弹窗的浓度由作者的「弹窗底色浓度」滑杆控制。
-      // 【10-18 18:40 作者:毛玻璃透明度别那么低】系数从 0.25 提到 0.6 ——
+      // 【10-18 15:45】菜单/弹窗的浓度由boss的「弹窗底色浓度」滑杆控制。
+      // 【10-18 18:40 boss:毛玻璃透明度别那么低】系数从 0.25 提到 0.6 ——
       // 滑杆默认 0.95 时浓度约 0.57(原来只有 0.24),配合模糊,选项文字更稳。
       // 滑杆仍可 0.5-1.0 调,拉满≈0.6 底 + 44px 模糊,接近苹果的控制中心。
       { name: '--dsw-specific-menu', lift: 0.04, floor: () => Math.max(PANEL_FLOOR, normalizePopupAlpha(state.popupAlpha) * 0.6) },
@@ -1335,7 +1423,7 @@ window.__ModuleLoader__.load({
       { name: '--dsw-alias-bg-module-platform', lift: 0.04, floor: PANEL_FLOOR },
       { name: '--dsw-alias-markdown-code-block', lift: 0.04, floor: PANEL_FLOOR },
       // ── 以下 7 枚是 10-18 15:40 补上的 ──
-      // 作者截图标出两处看不见:顶部标题栏、底部输入框。
+      // boss截图标出两处看不见:顶部标题栏、底部输入框。
       // 根因同一类:这些底色插件从来没洗过,还是主题原色(实色),
       // 而压在它们上面的文字被插件按半透底重算过 —— 两套对不上,字就没了。
       // 我把应用里所有 --dsw-specific-* 底色扫了一遍(9 枚),之前只洗了 2 枚。
@@ -1347,10 +1435,10 @@ window.__ModuleLoader__.load({
       { name: '--dsw-specific-sidebar-nav-item-active', lift: 0.04, floor: PANEL_FLOOR },
       { name: '--dsw-specific-sidebar-nav-item-active-accent', lift: 0.04, floor: PANEL_FLOOR },
       // ── 以下 8 枚是 10-18 16:20 补的 ──
-      // 作者实测:深色图时文字被调白,但某些元素**自带纯白实底**没被我洗,
+      // boss实测:深色图时文字被调白,但某些元素**自带纯白实底**没被我洗,
       // 白字压白底就消失了;浅色图时文字是黑的,压同一块白底反而看得见。
       // 这批全是「自带不透明实色」的按钮/卡片/更高层面板,之前一枚都没洗过。
-      // 「新会话」那个按钮就是 button-elevated-fill(纯白),正是作者框出来的位置。
+      // 「新会话」那个按钮就是 button-elevated-fill(纯白),正是boss框出来的位置。
       { name: '--dsw-alias-bg-layer-3', lift: 0.1, floor: PANEL_FLOOR },
       { name: '--dsw-alias-button-elevated-fill', lift: 0.1, floor: PANEL_FLOOR },
       { name: '--dsw-alias-interactive-bg-hover-solid', lift: 0.06, floor: PANEL_FLOOR },
@@ -1371,7 +1459,7 @@ window.__ModuleLoader__.load({
     /**
      * ═══ 10-19 09:4x 补洗的「不透明实色底」═══
      *
-     * 作者原话:「系统标识有白色底的,里面文字看不到。对话内容中有白色底色的
+     * boss原话:「系统标识有白色底的,里面文字看不到。对话内容中有白色底色的
      * 有的看的到,有的看不到。」
      *
      * 【根因】白字档(深色壁纸)下,SURFACE_LAYERS 只洗了「大底色」那一批,
@@ -1425,7 +1513,7 @@ window.__ModuleLoader__.load({
     /**
      * ═══ 组件自己的「局部变量」用的那几枚静态色板,也要跟着字色档翻(10-19 13:2x)═══
      *
-     * 作者红框圈出来的是消息里那张**交付文件卡片**(白底、写着文件名那张):
+     * boss红框圈出来的是消息里那张**交付文件卡片**(白底、写着文件名那张):
      * 浅色壁纸下黑字看得见,深色壁纸下字被刷成白的、卡片还是白的 → 看不见。
      *
      * 【根因】这张卡的底不是 alias token,是组件自己的一枚局部变量:
@@ -1541,7 +1629,7 @@ window.__ModuleLoader__.load({
     }
 
     /** 洗过之后这一层「实际显示出来的颜色」 垫底色按比例盖在图片上
-     *  wantsWhite 传 true 时垫暗底(白字那侧),见 veilBaseFor —— 22:57 作者选 A 之后
+     *  wantsWhite 传 true 时垫暗底(白字那侧),见 veilBaseFor —— 22:57 boss选 A 之后
      *  垫底方向跟字色走,不再跟主题走,所以这里也得跟着字色取色。 */
     function blendedSurface(scheme, name, alpha, imageRgbValue, wantsWhite) {
       const fallback = wantsWhite ? [15, 17, 22] : [255, 255, 255]
@@ -1617,10 +1705,10 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * ═══ 10-19 00:40 作者定的终版画法:底色保留,字色按底子选 ═══
+     * ═══ 10-19 00:40 boss定的终版画法:底色保留,字色按底子选 ═══
      *
-     * 作者原话(00:05):「不要用这个加白的底色,只是用一个白色的线框把它框起来」
-     * → 00:40 我改成底色全透明后,作者报:「有白色底的时候一样还是看不到文字。
+     * boss原话(00:05):「不要用这个加白的底色,只是用一个白色的线框把它框起来」
+     * → 00:40 我改成底色全透明后,boss报:「有白色底的时候一样还是看不到文字。
      *   如果说改不了把白色底变成白色框的话,那么我们建议有白色底的时候,文字用蓝色显示。」
      * 以及副作用:悬浮框毛玻璃没了、透明度滑杆失效了。
      *
@@ -1630,7 +1718,7 @@ window.__ModuleLoader__.load({
      * 【终版】
      *   - 底色**恢复**:按主题的正常层次填回来(毛玻璃回来了,滑杆管的那层遮罩也回来了)
      *   - 字色**按底色亮度选**:白底 → 蓝字;深底 → 白字;其余 → 黑字
-     *     「白色底用蓝字」是作者 00:40 亲口给的,不是我自己发明的
+     *     「白色底用蓝字」是boss 00:40 亲口给的,不是我自己发明的
      */
     function veilBaseFor(name, wantsWhite) {
       /**
@@ -1648,9 +1736,9 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * 白底上用的蓝字。作者 00:40 亲口定的:「有白色底的时候,文字用蓝色显示」。
+     * 白底上用的蓝字。boss 00:40 亲口定的:「有白色底的时候,文字用蓝色显示」。
      *
-     * 【10-19 16:2x 起不再自动选用】作者报「文字通篇蓝色」后又撤了这一档，
+     * 【10-19 16:2x 起不再自动选用】boss报「文字通篇蓝色」后又撤了这一档，
      * 字色只按壁纸明暗出黑/白两种（见下面 band 那段注释）。
      * 调色板留着 —— 哪天真遇到白底面板看不清，按更窄的判据能直接接回来。
      */
@@ -1701,7 +1789,7 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * ═══ 判黑白字:按切块的面积占比(作者 10-18 22:15 亲口给的判据)═══
+     * ═══ 判黑白字:按切块的面积占比(boss 10-18 22:15 亲口给的判据)═══
      *
      * 原话:「每张图片你都可以把它切割成小方块,计算它当下的黑白明度占比,
      * 或者是灰色的占比,然后你就能匹配相应的文字呀。
@@ -1710,9 +1798,9 @@ window.__ModuleLoader__.load({
      * 判定顺序:
      *   1. 黑块面积明显多于白块 → 白字
      *   2. 白块面积明显多于黑块 → 黑字
-     *   3. 黑白差不多(差不到 5%)→ 看灰块本身偏哪边 —— 就是作者说的「灰色的占比」
+     *   3. 黑白差不多(差不到 5%)→ 看灰块本身偏哪边 —— 就是boss说的「灰色的占比」
      *
-     * 作者 22:15 给的两张夜景截图正是这个判据要治的毛病:夜景一半黑天空一半亮楼,
+     * boss 22:15 给的两张夜景截图正是这个判据要治的毛病:夜景一半黑天空一半亮楼,
      * 取平均落在中间,按中间判就配了黑字,压到黑天空上直接糊。
      *
      * 老图没有切块数据(字段是 22:15 才加的)→ 回退到 21:30 的三档口径,
@@ -1740,15 +1828,15 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * ═══ 自动垫底(作者 10-18 21:40「一起都改」)═══
+     * ═══ 自动垫底(boss 10-18 21:40「一起都改」)═══
      *
      * 算这张图的**最低透明度**:低到这条线以下,字压在这张图最糟的那块地方就看不清了。
-     * 之前滑杆能一路拖到 0,作者拖到看不清为止才停 —— 12% 是他自己试出来的。
+     * 之前滑杆能一路拖到 0,boss拖到看不清为止才停 —— 12% 是他自己试出来的。
      * 现在系统替他算,拖不下去。
      *
      * 算的是「字压在对话区最暗(或最亮)那一小块」的对比度,不是整图平均。
      *
-     * 【10-18 22:57 作者选 A 之后,方向不再由主题决定】
+     * 【10-18 22:57 boss选 A 之后,方向不再由主题决定】
      * 以前这里写死「浅色主题垫白、深色主题垫黑」,于是浅色主题配白字时垫多少都没用,
      * 只能返回 0 让 fixIfBlind 硬扛。现在垫底方向跟字色走(见 veilBaseFor):
      * 黑字往亮处垫,白字往暗处垫 —— 任何组合都垫得动,所以这道方向门整个删掉了。
@@ -1784,7 +1872,7 @@ window.__ModuleLoader__.load({
       /**
        * 【23:20 / 00:40 两次教训】wantsWhite 在**两个独立的 if 块**里都要用,
        * 必须声明在两块之外(函数级)。00:40 我把它写在第一个块里,
-       * 第二个块直接 ReferenceError —— 又是防线抓到的,不是作者重启发现的。
+       * 第二个块直接 ReferenceError —— 又是防线抓到的,不是boss重启发现的。
        */
       const wantsWhite = !!entry && inkToneFor(entry, activeScheme()) === 'white'
       if (entry) {
@@ -1810,7 +1898,7 @@ window.__ModuleLoader__.load({
         /**
          * ═══ 不透明实色底:按字色极性直接给两套色(见上面 SOLID_FILLS)═══
          *
-         * 【10-19 09:4x 作者报的两处看不见都在这】以前只洗大底色,
+         * 【10-19 09:4x boss报的两处看不见都在这】以前只洗大底色,
          * 这些实色底一枚没洗 —— 白字档下它们留成白的,字是白的,压上去就没了。
          * 现在:**白字档给应用的深色值,黑字档给浅色值**。
          * 两个方向都要写死:字体档由「壁纸亮不亮」定,和「应用现在是浅色主题还是
@@ -1822,7 +1910,7 @@ window.__ModuleLoader__.load({
         }
         /**
          * ═══ 组件「局部变量」吃的那几枚静态色板,一起翻(10-19 13:2x)═══
-         * 作者红框那张**交付文件卡片**的底走的就是这条路(见 STATIC_SURFACE_FLIP 说明)。
+         * boss红框那张**交付文件卡片**的底走的就是这条路(见 STATIC_SURFACE_FLIP 说明)。
          * 这四枚一次治住「card / changes / deliverable / plan-card」四张卡的底与 hover。
          */
         for (const stat of STATIC_SURFACE_FLIP) {
@@ -1838,7 +1926,7 @@ window.__ModuleLoader__.load({
       // 字跟它背后实际显示出来的颜色可能撞在一起浅色主题 + 亮图 = 白块白字)。
       // 这里自己算一遍对比度,不够就把字翻成黑或白。手动选的字色不动。
       //
-      // 【作者 10-18 12:20】第三级文字色必须单独保底,而且判据要比主文字更严。
+      // 【boss 10-18 12:20】第三级文字色必须单独保底,而且判据要比主文字更严。
       // 这枚色画的是文件夹图标和「进行中」那行状态字 —— 它设计出来就是灰扑扑的
       // (浅色主题 #8d95a3),原本配实底凑合能用。插件把它洗成半透背景上的暗灰之后,
       // 图标和状态字直接消失。同一个小绿点(「完成」)用的是状态色,插件从不碰它,
@@ -1851,13 +1939,13 @@ window.__ModuleLoader__.load({
         const hex = (rgb) => '#' + rgb.map((v) => clamp(Math.round(v), 0, 255).toString(16).padStart(2, '0')).join('')
 
         /**
-         * ══════ 反差色三档(作者 10-18 21:30 亲口定,21:40 补了垫底)══════
+         * ══════ 反差色三档(boss 10-18 21:30 亲口定,21:40 补了垫底)══════
          *
-         * 【10-18 18:40 作者报的坑】一张明显偏亮的粉白图却配了白字。
+         * 【10-18 18:40 boss报的坑】一张明显偏亮的粉白图却配了白字。
          * 根因:判亮度用的是图片"主色"——主色算法挑的是**最饱和**的颜色,
          * 这张图最饱和的是暗红发饰(#401116),于是被当成暗图配了白字。
-         * 作者眼睛看到的是整张图的亮堂,不是发饰那块。
-         * 18:40 改成用整图平均亮度,21:30 作者嫌还是一个点太粗,又收成三档:
+         * boss眼睛看到的是整张图的亮堂,不是发饰那块。
+         * 18:40 改成用整图平均亮度,21:30 boss嫌还是一个点太粗,又收成三档:
          * 低于 0.10 白字、高于 0.15 黑字、中间那一档交给主题。
          *
          * surfaces 仍然照算 —— 它是 fixIfBlind 的输入,那一层还照旧保底。
@@ -1869,7 +1957,7 @@ window.__ModuleLoader__.load({
          * 22:57 改垫底方向时我把「垫底跟字色走」塞进了 surfaces 的计算里,
          * 却把 const band 留在了后面 —— JS 里 const 有"暂时性死区",
          * 提前用会抛 ReferenceError,而外层 try/catch 又把它吞了,
-         * 结果就是:作者选任何一张图,换肤静默失败,界面「没反应」。
+         * 结果就是:boss选任何一张图,换肤静默失败,界面「没反应」。
          * 教训:这类"变量挪位置"的改动,语法检查(npm --check)是查不出来的,
          * 必须让验证脚本把异常打出来才能发现。
          */
@@ -1888,9 +1976,9 @@ window.__ModuleLoader__.load({
           })
 
         /**
-         * ═══ 字色只有黑/白两档（10-19 16:2x 作者又打回一次：蓝字档整个撤掉）═══
+         * ═══ 字色只有黑/白两档（10-19 16:2x boss又打回一次：蓝字档整个撤掉）═══
          *
-         * 作者 16:17 原话：「已经重启过了，但是还是出现了文字通篇蓝色的，
+         * boss 16:17 原话：「已经重启过了，但是还是出现了文字通篇蓝色的，
          * 可能之前修bug没修完。」附了一张亮壁纸的截图。
          *
          * 【量出来的证据】拿他那张截图直接量（verify/measure_ink.py）：
@@ -1898,7 +1986,7 @@ window.__ModuleLoader__.load({
          *   · 蓝字实测只有 **2.55 : 1**（纯黑字压同一片底是 **11.22 : 1**）
          * 也就是说：这一档既不该出现，出现了还比黑字差四倍多。
          *
-         * 【蓝字档是怎么又冒出来的】00:56 那次作者打回过一次，原话是
+         * 【蓝字档是怎么又冒出来的】00:56 那次boss打回过一次，原话是
          * 「我们默认的字体只有黑跟白两种，这就不对了，这是一个 bug」——
          * 当时定的是「屏幕上真的有一层白」才用蓝，判据里有个 `wash > 0.08`。
          * 那会儿 wash 锁 0，所以全库 0 张命中，看着像"蓝字已经绝迹"。可后来
@@ -1907,7 +1995,7 @@ window.__ModuleLoader__.load({
          * **这不是新 bug，是老判据的漏洞被补丁重新打开了。**
          *
          * 【现在】字色只按壁纸明暗二选一（inkToneFor：黑块多→白字、亮块多→黑字）。
-         * 蓝字调色板 BLUE_INK 留在文件里（作者 00:40 提过白底蓝字这个想法），
+         * 蓝字调色板 BLUE_INK 留在文件里（boss 00:40 提过白底蓝字这个想法），
          * 但**不再自动选用**：真机上那些会让白字压白底的情况，
          * 已经由 SOLID_FILLS / STATIC_SURFACE_FLIP 两轮补洗按字色档翻掉了，
          * 没有"必须靠蓝字救"的底了。哪天真遇到白底面板看不清，再按更窄的判据加回来。
@@ -1967,7 +2055,7 @@ window.__ModuleLoader__.load({
         tokens['--dsw-alias-label-dimmed'] = both(ink.dimmed)
         tokens['--dsw-alias-label-primary-dimmed'] = both(ink.dimmed)
         /**
-         * 【10-19 07:15 / 08:03 / 08:45 作者三次报同一个问题】
+         * 【10-19 07:15 / 08:03 / 08:45 boss三次报同一个问题】
          * 「还有一些系统图标也是你加了白色底色的,图标里面应该显示黑色,但是现在看不到了。」
          * 「系统图标你加了白色充填底衬之后,就基本上显示不出来原有的内容了。」
          * 前两次都没修到根上,原因见下面那段的注释 —— 这次不再自己另算背景。
@@ -1981,7 +2069,7 @@ window.__ModuleLoader__.load({
          * 【为什么不再自己算一遍「背后多亮」】算了三次都不对,根因是
          * 「算出来的背景」和「真正写进去的底色」是两条独立的路,
          * 中间任何一处不一致(主题取不到、兜底值不同)都会让两者对不上:
-         * 底色是白的、图标也判成白的 —— 作者三次看到的都是这个。
+         * 底色是白的、图标也判成白的 —— boss三次看到的都是这个。
          *
          * 现在直接读**写好的那个值**,按它判:菜单底是亮的 → 黑图标;
          * 暗的 → 白图标。判据和落点从此不可能不一致。
@@ -2050,7 +2138,7 @@ window.__ModuleLoader__.load({
       } catch (e) {
         layerDispose = null
         /**
-         * 【23:18】这里以前是静默吞异常 —— 结果 23:08 作者报「选图片没反应」时,
+         * 【23:18】这里以前是静默吞异常 —— 结果 23:08 boss报「选图片没反应」时,
          * 验证脚本还照样报绿,把我骗过去了。现在异常会打到控制台,
          * 并且 full_verify.cjs 有一条硬判据专门抓这种「静默失败」(见那个脚本)。
          */
@@ -2065,20 +2153,20 @@ window.__ModuleLoader__.load({
     const cssEscape = (value) => String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/[\r\n]/g, '')
 
     /**
-     * 进行中那个转圈的颜色(作者 10-18 16:45 提的)。
+     * 进行中那个转圈的颜色(boss 10-18 16:45 提的)。
      *
      * 原来它跟着「第三级文字色」走,那是半透明的灰,所以圈一直是灰的、不显眼。
-     * 现在按作者定的反差色:
+     * 现在按boss定的反差色:
      *   底色偏亮 → 亮绿圈(和完成的小绿点同色系,但提一档亮度更跳)
      *   底色偏暗 → 白圈
      * 转圈的 svg 带 data-state="ongoing",弧线用 currentColor,
      * 所以覆盖这一条 color 就能改圈色。
      */
     function spinnerCssFor() {
-      // 【10-18 19:20 作者:「所有任务前面的转圈都改成绿色的,
+      // 【10-18 19:20 boss:「所有任务前面的转圈都改成绿色的,
       // 不要再根据背景颜色图片的改变做出调整了,我看了一下用绿色的是最好的」】
       // 所以这里彻底不看 inkIsWhite 了 —— 不管深图浅图,转圈一律绿。
-      // (之前是 inkIsWhite ? 白 : 绿,作者嫌换来换去不统一。)
+      // (之前是 inkIsWhite ? 白 : 绿,boss嫌换来换去不统一。)
       // 弧线用 currentColor,覆盖 [data-state=ongoing] 的 color 就能改圈色。
       const color = '#00e676'
       const glow = 'drop-shadow(0 0 2px rgba(0, 230, 118, 0.45))'
@@ -2093,9 +2181,9 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * 完成/需要授权那些「点」放大(作者 10-18 17:16 提的)
+     * 完成/需要授权那些「点」放大(boss 10-18 17:16 提的)
      *
-     * 作者说的"有时橘黄有时绿"就是这几种状态点:绿=完成、黄=要授权、红=出错。
+     * boss说的"有时橘黄有时绿"就是这几种状态点:绿=完成、黄=要授权、红=出错。
      *
      * 【为什么不直接改宽高】点是 10px 外框 + 里面画一个占 60% 的圆(实际只有 6px)。
      *   改外框会挤到侧栏那一行(行高 32px、槽位宽 16px),而且
@@ -2103,7 +2191,7 @@ window.__ModuleLoader__.load({
      *
      * 【用的办法】只把里面那个圆的占比提上去,外框尺寸一动不动:
      *   原来 inset:20% → 圆占 60% = 6px
-     *   10-18 17:36 作者要从 1.6 倍收到 1.3 倍 → inset:11% → 圆占 78% = 7.8px
+     *   10-18 17:36 boss要从 1.6 倍收到 1.3 倍 → inset:11% → 圆占 78% = 7.8px
      *   7.8 ÷ 6 = 1.30 倍
      *   不碰任何布局、不会误伤按钮。:after 这个写法只有圆点在用。
      */
@@ -2115,17 +2203,17 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * 苹果毛玻璃(作者 10-18 18:23 提的:「所有点出来的选项用毛玻璃状态」)
+     * 苹果毛玻璃(boss 10-18 18:23 提的:「所有点出来的选项用毛玻璃状态」)
      *
      * 【为什么这个方案对】之前为了让字看得清,只能把浮层底色往实里加 ——
-     * 加实了就变成一块死板的板子,把背景图挡得死死的,作者嫌难看。
+     * 加实了就变成一块死板的板子,把背景图挡得死死的,boss嫌难看。
      * 毛玻璃换了个思路:**字看得清不靠底色变实,靠把背后的图糊掉**。
      * 底色保持半透,底下加一层模糊 + 提饱和,字自然跳出来,图也还在。
      *
      * 【挂在现成钩子上,不自己造】应用本来就留了两枚毛玻璃变量:
      *   --dsw-menu-backdrop-filter  菜单/下拉那批浮层在用(7 处),默认 blur(40px) saturate(150%)
      *   --dsw-mask-blur             设置页背后那层遮罩在用,默认是 none —— 等于没开!
-     * 作者说"设置页点开还是透明、没有底色填充",根因就在这:
+     * boss说"设置页点开还是透明、没有底色填充",根因就在这:
      * 遮罩没模糊 + 面板底色被我们洗到 0.18,两层都透,叠起来就是空的。
      *
      * 这里把两枚钩子都开足,设置页和菜单一起变毛玻璃。
@@ -2140,7 +2228,7 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * 悬浮框里的滚动条改成红色(作者 10-18 20:56 原话:「悬浮框里面的选项,
+     * 悬浮框里的滚动条改成红色(boss 10-18 20:56 原话:「悬浮框里面的选项,
      * 存在左滑跟下滑全部都用红色显示,否则的话太不明显了」)
      *
      * 【为什么不自己重写一套 ::-webkit-scrollbar】
@@ -2149,7 +2237,7 @@ window.__ModuleLoader__.load({
      * 自己重写一套反而要多打八条规则,还得跟应用的圆角、内边距打架。
      * 直接改这三枚变量,滚动条的形状还是应用原来那套,只换了颜色。
      *
-     * 【为什么挂在面板这一层】作者说的是"悬浮框里面",聊天区和设置页的滚动条不动,
+     * 【为什么挂在面板这一层】boss说的是"悬浮框里面",聊天区和设置页的滚动条不动,
      * 全站红条太扎眼。变量会往下传,面板里所有能滚的地方(面板本身、图库那一格)
      * 一并变红,不用挨个挂钩子。
      */
@@ -2165,11 +2253,11 @@ window.__ModuleLoader__.load({
     ].join('')
 
     /**
-     * 文字光晕跟着当前这张图的字色走(作者 22:57 选 A 之后配套的一手,
+     * 文字光晕跟着当前这张图的字色走(boss 22:57 选 A 之后配套的一手,
      * 做法抄自 同系列换肤脚本 换肤手册第七节 —— 见 inkShadowCss 的注释)。
      *
      * 【23:08 改过一次】第一版靠给 body 增删一个 class 来开关光晕,
-     * 作者重启后报「选了图片直接没反应」—— 那个 class 一加一删就改动了
+     * boss重启后报「选了图片直接没反应」—— 那个 class 一加一删就改动了
      * 全应用所有元素的文字渲染,叠上换图时的重绘,界面直接卡住不响应。
      * 现在完全不碰 DOM:直接拼进那份壁纸样式,跟着别的样式整体替换;
      * 没选图就返回空串自动撤掉,没有任何额外操作。
@@ -2192,7 +2280,7 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * 竖图渲染(作者 10-18 18:15 报「竖图完全看不到图」的修复)
+     * 竖图渲染(boss 10-18 18:15 报「竖图完全看不到图」的修复)
      *
      * 【根因】CSS 绘制顺序里,负 z-index 的元素画在 canvas(html 背景)**之上**。
      * 原来主图挂在 html 背景上,模糊垫底层(z-index:-2)盖满全屏、几乎不透明 ——
@@ -2206,7 +2294,7 @@ window.__ModuleLoader__.load({
     function portraitCssFor(frontUrl, bleedUrl, mode, bleedPx) {
       const pos = mode === 'right' ? 'right center' : 'center center'
       const radius = clamp(Math.round(Number(bleedPx) || 0), 0, 64)
-      // 【10-18 20:45 作者同意 D:竖图两侧那层模糊过渡改成可调】
+      // 【10-18 20:45 boss同意 D:竖图两侧那层模糊过渡改成可调】
       // 拉到 0 就干脆不要这层 —— 两侧露干净的底色,不糊。
       const bleedCss = radius > 0
         ? '.dsh-skin-bleed{position:fixed;inset:0;z-index:-2;pointer-events:none;' +
@@ -2278,7 +2366,7 @@ window.__ModuleLoader__.load({
     // ── 界面动作 ──────────────────────────────────────────
     // 注意:下面这几个动作都**不要**自己 notify()。
     // refreshBackground() 结尾统一会notify 一次这里再叫一次就是同一个动作
-    // 把整个面板重画两遍作者拖一下滑杆就是两次全量重绘。
+    // 把整个面板重画两遍boss拖一下滑杆就是两次全量重绘。
     async function selectImage(id) {
       state = { ...state, activeId: id }
       await refreshBackground()
@@ -2286,6 +2374,63 @@ window.__ModuleLoader__.load({
       // 不批量重算(1387 张逐张加载会把界面卡死),翻到哪张补哪张 —— 第一次慢一下,之后走缓存。
       void ensureBands(currentEntry())
       await saveState({ activeId: id })
+    }
+
+    /**
+     * ═══ 双击右键：自定义背景 ⇄ 系统默认壁纸 ═══════════════════════
+     *
+     * 【10-22 00:0x boss】「双击右键切换为自定义背景，或者是双击右键从自定义背景切换成系统的默认壁纸」
+     *
+     * 两种状态来回切：
+     *   现在挂着自定义壁纸 → 撤掉壁纸，回到没装换肤时的样子（**只撤壁纸**）
+     *   现在是默认（没壁纸）     → 换回上一次那张自定义壁纸（没记住就用图库第一张）
+     *
+     * ⚠️ 为什么不直接调 `restoreDefaults()`：
+     *    那个是面板里的「恢复默认界面」，它**连配色、模式、自动换肤一起撤**。
+     *    boss要的是"切个壁纸"，不该顺手把他调好的专注/休闲模式和文字颜色也清掉。
+     *    所以这里只动 `activeId`，其余设置原样保留。
+     *
+     * 【10-22 00:3x boss确认「就是在插件里面做壁纸的自定义快捷切换」】
+     *   → "记住上次那张"**必须落盘**（`state.lastWallId`），否则重启后双击右键
+     *     切回去的是图库第一张，那就不是快捷切换了。
+     *
+     * 【10-22 07:4x boss选 A】「切回默认时，自动把『自动换肤』暂停」
+     *   不暂停的话：刚按右键切成干净界面，一分钟（或您设的间隔）到点又自己换回来
+     *   —— 右键这股等于白按。所以切默认时**顺手把自动换肤关掉**并落盘，
+     *   提示条也明说「自动换肤已暂停」，免得boss以为设置被吃了。
+     *   ⚠️ 反过来（切回自定义）**不自动恢复**自动换肤：boss要再开就双击左键，别替他决定。
+     */
+    async function toggleWallpaperDefault() {
+      const dict = dictFor()
+      // ① 当前有自定义壁纸 → 切回系统默认（把这张记进存档，重启后也认）
+      if (state.activeId) {
+        const keep = state.activeId
+        const hadRotate = normalizeRotate(state.rotateMinutes) > 0
+        state = {
+          ...state,
+          activeId: '',
+          lastWallId: keep,
+          rotateMinutes: hadRotate ? 0 : state.rotateMinutes,
+        }
+        // refreshBackground 拿到空 activeId 会自己撤掉图层、清空 CSS 并通知重画
+        await refreshBackground()
+        // ⚠️ 必须重排一次：光把 state 改掉不清定时器，到点照样会换回来
+        scheduleRotate()
+        await saveState({
+          activeId: '',
+          lastWallId: keep,
+          rotateMinutes: hadRotate ? 0 : state.rotateMinutes,
+        })
+        return { ok: true, text: hadRotate ? dict.wallToDefaultPaused : dict.wallToDefault }
+      }
+      // ② 当前是默认 → 切回上次那张（存档里那张被删了/没有就退图库第一张）
+      const remembered = state.lastWallId && library.some((item) => item.id === state.lastWallId)
+        ? state.lastWallId
+        : ''
+      const target = remembered || (library[0]?.id ?? '')
+      if (!target) return { ok: false, text: dict.wallNoImage }
+      await selectImage(target)
+      return { ok: true, text: dict.wallToCustom }
     }
 
     /**
@@ -2384,7 +2529,7 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * ═══ 提示音(作者 10-18 23:45 选 A)═══
+     * ═══ 提示音(boss 10-18 23:45 选 A)═══
      *
      * 一声短「叮」,用界面自带的发声能力现场合成 —— 不需要音频文件,也不联网。
      * 做法:一个音 + 一个比它高一点点的音叠在一起,快速由响变轻,听着像提示音。
@@ -2439,7 +2584,7 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * ═══ 自定义音效(作者 10-19 00:20 要的「添加窗口」)═══
+     * ═══ 自定义音效(boss 10-19 00:20 要的「添加窗口」)═══
      *
      * 音频归主机端管(换端口不丢),页面按 id 取回来播。
      * 用 <audio> 元素播 —— 比 AudioContext 简单,长音频、循环都能管。
@@ -2502,7 +2647,7 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * 面板语言：一键切中/英（作者 10-19 21:1x：「中英双语…默认中文…一键切换」）。
+     * 面板语言：一键切中/英（boss 10-19 21:1x：「中英双语…默认中文…一键切换」）。
      * 立刻重画 + 落盘记住 —— 下次打开还是这套语言。
      */
     async function setLang(next) {
@@ -2523,7 +2668,7 @@ window.__ModuleLoader__.load({
       await saveState({ onboarded: true })
     }
 
-    // ── 自定义音效(作者 10-19 00:20 要的) ─────────────────
+    // ── 自定义音效(boss 10-19 00:20 要的) ─────────────────
     /** 拉一次列表。面板打开时调,失败就当没有。 */
     async function loadSoundList() {
       try {
@@ -2556,7 +2701,7 @@ window.__ModuleLoader__.load({
     /**
      * 上传一个音频。
      * 只收常见格式,单个 8MB 封顶,再加总量两道闸(条数 / 总容量,见 SOUND_CAPS_FALLBACK)。
-     * 失败会给一句明话,不让作者看着像点了没反应。
+     * 失败会给一句明话,不让boss看着像点了没反应。
      *
      * @param quiet 批量添加时传 true —— 那时一句一条太吵,由调用方汇总成一句
      * @returns 'added' | 'bad' | 'big' | 'full' | 'space' | 'fail' | 'skip'
@@ -2614,7 +2759,7 @@ window.__ModuleLoader__.load({
         }
         return 'added'
       } catch (error) {
-        // 主机端报的错(比如总量满了/超大小)原样带给作者看
+        // 主机端报的错(比如总量满了/超大小)原样带给boss看
         const text = String(error?.message || '添加失败,换个文件试试')
         if (quiet) return 'fail'
         say(text)
@@ -2623,7 +2768,7 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * ═══ 批量添加(作者 10-19 13:55:「音效支持批量添加」)═══
+     * ═══ 批量添加(boss 10-19 13:55:「音效支持批量添加」)═══
      *
      * 【以前是什么样】选文件框没开多选、代码只取 files[0] ——
      * 一次框选 10 个只进去第一个,另外 9 个**一声不响地没了**。
@@ -2636,7 +2781,7 @@ window.__ModuleLoader__.load({
       const tally = { added: 0, bad: 0, big: 0, full: 0, space: 0, fail: 0 }
       /**
        * 【10-19 13:55 顺手防一个老毛病】加十几个文件要好几秒 —— 面板上如果一直没动静,
-       * 作者看到的就是「点了没反应」,之前报过好几次这类事。所以过程中报进度。
+       * boss看到的就是「点了没反应」,之前报过好几次这类事。所以过程中报进度。
        */
       let done = 0
       soundNote = `正在添加 0/${picked.length}…`
@@ -2696,9 +2841,9 @@ window.__ModuleLoader__.load({
     /** 每秒问一次主机「有没有任务刚完成」。开销可以忽略。*/
     let lastBellSeen = 0
     /**
-     * 【10-19 19:5x 作者「我开了也试听了，但是还是没用」的真凶】
+     * 【10-19 19:5x boss「我开了也试听了，但是还是没用」的真凶】
      *
-     * 作者重启后开了开关、点了试听、跑了个任务 —— 一声没响。
+     * boss重启后开了开关、点了试听、跑了个任务 —— 一声没响。
      * 查出问题在这一句：`if (lastBellSeen !== 0 && state.soundOn)`。
      *
      * 【为什么】主机端刚起来时 at=0，页面前几轮问到的都是 0，`at > 0` 不成立，
@@ -2706,7 +2851,7 @@ window.__ModuleLoader__.load({
      * 等第一个任务真的完成、主机把 at 写成 T 之后，这一轮命中的是
      * 「lastBellSeen !== 0」这个"第一次别响"的判断 —— 于是**第一个完成被吞了**。
      * 也就是说：每次重启后跑的第一个任务，永远不响；第二个才开始响。
-     * 作者刚好只试了第一个，所以看着像"开关根本没接上"。
+     * boss刚好只试了第一个，所以看着像"开关根本没接上"。
      *
      * 【为什么当初会写成这样】本意是「主机端可能留着插件启动之前那次完成的旧时间戳，
      * 别一启动就补响一声」。可主机端**每次跟应用一起重启、at 从 0 开始**，
@@ -2749,8 +2894,10 @@ window.__ModuleLoader__.load({
      * 设置重置回默认值但不清空图库 ——图还在随时能再选一张
      */
     async function restoreDefaults() {
-      // 悬浮球的位置留着:「恢复默认」是撤配色和壁纸,不是把作者拖好的球弹回角落
-      state = { activeId: '', wash: null, text: 'follow', mode: 'normal', rotateMinutes: 0, popupAlpha: POPUP_ALPHA_DEFAULT, ballX: state.ballX, ballY: state.ballY, bleed: 64, soundOn: state.soundOn, soundVolume: state.soundVolume, soundId: state.soundId, lang: state.lang }
+      // 悬浮球的位置留着:「恢复默认」是撤配色和壁纸,不是把boss拖好的球弹回角落
+      // 【10-22 00:3x】`lastWallId` 也留着 —— 撤了壁纸之后，双击右键仍能切回刚才那张
+      const keepWallId = state.activeId || state.lastWallId
+      state = { activeId: '', wash: null, text: 'follow', mode: 'normal', rotateMinutes: 0, popupAlpha: POPUP_ALPHA_DEFAULT, ballX: state.ballX, ballY: state.ballY, bleed: 64, soundOn: state.soundOn, soundVolume: state.soundVolume, soundId: state.soundId, lang: state.lang, lastWallId: keepWallId }
       activeTone = null
       wallpaperCssText = ''
       syncBleedLayer(false)
@@ -2764,7 +2911,13 @@ window.__ModuleLoader__.load({
       }
       lastImportNote = null
       notify()
-      await saveState({ activeId: '', wash: null, text: 'follow', mode: 'normal', rotateMinutes: 0, popupAlpha: POPUP_ALPHA_DEFAULT })
+      /**
+       * 【10-22 01:1x 全功能自检抓出来的真 bug】
+       *   这里原来落盘**没带 `lastWallId`** —— 客户端内存里保留了两张图，
+       *   但服务端存档还是旧值 → 重启后双击右键切回去的不是"恢复前那张"。
+       *   现在把 keepWallId 一起存。
+       */
+      await saveState({ activeId: '', wash: null, text: 'follow', mode: 'normal', rotateMinutes: 0, popupAlpha: POPUP_ALPHA_DEFAULT, lastWallId: keepWallId })
     }
 
     async function removeImage(id) {
@@ -2783,10 +2936,34 @@ window.__ModuleLoader__.load({
       await refreshBackground()
     }
 
+    /**
+     * 【10-22 20:1x boss】图库里的「下一张」——**按图库排列顺序**走下一张。
+     *
+     * boss原话：「把这里的『换一张』变成『下一张』，意思是按照当前的图片排列，
+     *           变换成下一张的壁纸，**因为下面已经有了『自定义随机换一张』**。」
+     *
+     * 为什么要改（这是根因，不是偏好）：
+     *   原来这个按钮调的是 `pickRandomImageId()` —— **随机抽**（`Math.random`），
+     *   跟下面「背景图片随机变换时间」是**同一套随机逻辑**（同一个函数）。
+     *   两个入口干同一件事，随机模式下还经常"点了没变化"（抽到当前这张就再抽一次）。
+     *   ⇒ 这个按钮改成**顺序走**：按图库里当前的排列位置，往后走一张；
+     *     到最后一张就**回到第一张**（循环，不越界）。
+     *
+     * ⚠️ 顺序是**图库里 `library` 数组的顺序**（也就是下面那排缩略图从左到右的顺序），
+     *    不是文件名排序 —— boss看到的排列就是判据。
+     */
+    function pickNextImageId() {
+      if (library.length < 2) return null
+      const at = library.findIndex((item) => item.id === state.activeId)
+      // 当前那张不在图库里（被删了/换过了）→ 从第一张开始
+      if (at < 0) return library[0]?.id ?? null
+      return library[(at + 1) % library.length]?.id ?? null
+    }
+
     // ── 背景图片随机变换 ─────────────────────────────────
     /**
      * 到点了自己抽一张换上。三个条件都得满足才行
-     *   设了时间、库里至少两张、当前没在导图导图时换会把作者正在挑的图顶掉。
+     *   设了时间、库里至少两张、当前没在导图导图时换会把boss正在挑的图顶掉。
      * 抽到当前这张就再抽一次所以不会「到点没变化」。
      */
     function pickRandomImageId() {
@@ -2807,7 +2984,7 @@ window.__ModuleLoader__.load({
       }
       const minutes = normalizeRotate(state.rotateMinutes)
       if (minutes <= 0 || library.length < 2) return
-      // setTimeout 上限约24.8 天作者的上限是 10 天这里不用分片
+      // setTimeout 上限约24.8 天boss的上限是 10 天这里不用分片
       rotateTimer = setTimeout(() => {
         rotateTimer = null
         if (!importing) {
@@ -2827,9 +3004,9 @@ window.__ModuleLoader__.load({
       await saveState({ rotateMinutes: minutes })
     }
 
-    // 【10-18 19:10 作者:「双击悬浮窗自动换肤;已经是自动换肤状态就双击关掉」】
-    // 记住上次用的间隔,双击重新打开时还用它,不给作者换一套没听过的数字。
-    // 默认给 5 分钟 —— 1 分钟太勤,作者之前抱怨过"换得勤"。
+    // 【10-18 19:10 boss:「双击悬浮窗自动换肤;已经是自动换肤状态就双击关掉」】
+    // 记住上次用的间隔,双击重新打开时还用它,不给boss换一套没听过的数字。
+    // 默认给 5 分钟 —— 1 分钟太勤,boss之前抱怨过"换得勤"。
     let lastRotateMinutes = 5
     async function toggleAutoRotate() {
       const dict = dictFor()
@@ -2863,6 +3040,166 @@ window.__ModuleLoader__.load({
       }
     }
 
+    /* ═══ 面板美化的共用样式（2026-10-22 16:4x boss）════════════════
+     *
+     * boss：「对悬浮窗展开的选项做一个相关的界面美化，并且自检通过。
+     *        要求不伤现在的核心功能。」
+     *
+     * ## 做法：加一层**共用样式**，不去改每个控件的逻辑
+     *   这一组常量只管**长什么样**（间距、圆角、字重、分隔线、底色），
+     *   **不碰任何 onClick / 状态 / 存盘逻辑** ——
+     *   改完跑全量回归，任何一项不过就回滚。
+     *
+     * ## 为什么要集中在一处
+     *   之前每一段都是**手写内联样式**，同样的东西抄了七八遍
+     *   （`marginBottom: 18`、`fontSize: 12`、按钮圆角…），
+     *   结果是「改一处要改八处」，很容易漏、也很容易改串。
+     *   收进这一组之后，**面板整体的样子只由这一处决定**。
+     *
+     * ## 视觉上改了什么（boss能看出来的四点）
+     *   ① 每一段前面加一根**短竖条 + 加粗标题**（原来只有一行灰字，容易滑过去）
+     *   ② 段与段之间加**分隔线**，改成一个一个的组（原来是一长条黏在一起）
+     *   ③ 分段控件（模式/时长/提示音）改成**带底槽的胶囊**，选中项浮起来
+     *   ④ 说明文字的**行高**放宽（原来挤在一起，小字看着费劲）
+     */
+    const PANEL_UI = {
+      // 段与段之间：上边距 + 一条分隔线
+      sectionGap: { marginTop: 18, paddingTop: 16, borderTop: `1px solid ${T.border}` },
+      // 段标题：短竖条 + 加粗
+      titleRow: { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 },
+      titleMark: { width: 3, height: 12, borderRadius: 2, background: T.accent, flex: '0 0 auto' },
+      titleText: { fontSize: 12, fontWeight: 600, color: T.primary, letterSpacing: '0.2px' },
+      // 说明小字：行高放宽
+      hint: { marginTop: 8, fontSize: 11, lineHeight: 1.6, color: T.secondary },
+      // 胶囊底槽（分段控件的外框）
+      segmentTrack: {
+        display: 'flex',
+        gap: 6,
+        padding: 4,
+        borderRadius: 12,
+        background: T.button,
+      },
+      // 胶囊里的一项（选中的在下面单独处理）
+      segmentItem: {
+        flex: 1,
+        padding: '7px 8px',
+        fontSize: 12,
+        cursor: 'pointer',
+        borderRadius: 9,
+        border: '1px solid transparent',
+        background: 'transparent',
+        color: T.secondary,
+        fontWeight: 400,
+      },
+      // 选中的那项：浮起来（白底 + 边框 + 深字）
+      segmentItemOn: {
+        flex: 1,
+        padding: '7px 8px',
+        fontSize: 12,
+        cursor: 'pointer',
+        borderRadius: 9,
+        border: `1px solid ${T.borderStrong}`,
+        background: T.surface,
+        color: T.primary,
+        fontWeight: 600,
+      },
+      // 普通按钮：圆角大一档
+      button: { padding: '9px 12px', fontSize: 12, borderRadius: 10 },
+      // 次要按钮（"检查更新"那种）：用强调色
+      buttonAccent: {
+        padding: '9px 14px',
+        fontSize: 12,
+        borderRadius: 10,
+        border: `1px solid ${T.accent}`,
+        background: 'transparent',
+        color: T.accent,
+        cursor: 'pointer',
+      },
+    }
+
+    /** 一段的标题（小竖条 + 文字） */
+    function panelTitle(text) {
+      return h(
+        'div',
+        { style: PANEL_UI.titleRow },
+        h('span', { style: PANEL_UI.titleMark, 'aria-hidden': 'true' }),
+        h('span', { style: PANEL_UI.titleText }, text),
+      )
+    }
+
+    /** 一段下面那行说明小字 */
+    function panelHint(text) {
+      return h('div', { style: PANEL_UI.hint }, text)
+    }
+
+    /* ── 更新提示（【10-22 08:0x boss选 B】）───────────────────
+     *
+     * boss问：「别人下载了 GitHub 上的插件，我们更新之后，他会收到升级的通知吗」
+     * 查完：不会（插件没自查、GitHub 不通知下载者、DSH 的更新徽标只认它自己的市场目录）。
+     * 所以插件自己查 —— 判据在主机端，页面只负责显示。
+     *
+     * ⚠️ 显示原则：**只有"确实有新版本"才显示**。
+     *    查不到 / 没网 / 没配置 → 一个像素都不出现。更新提示是加分项，
+     *    不该因为没网就在面板里挂个红字吓boss。
+     */
+    let updateInfoCache = { at: 0, data: null }
+
+    async function loadUpdateInfo() {
+      const now = Date.now()
+      if (updateInfoCache.data !== null && now - updateInfoCache.at < 6 * 60 * 60 * 1000) return updateInfoCache.data
+      try {
+        const data = await getJson(UPDATE_CHECK_PATH)
+        updateInfoCache = { at: now, data: data && typeof data === 'object' ? data : null }
+      } catch {
+        updateInfoCache = { at: now, data: null }
+      }
+      return updateInfoCache.data
+    }
+
+    /** 面板最上面那一行「有新版本 vX」——没有新版就返回 null */
+    function UpdateNotice() {
+      const dict = dictFor()
+      const [info, setInfo] = useState(null)
+      useEffect(() => {
+        let alive = true
+        void loadUpdateInfo().then((data) => {
+          if (alive) setInfo(data)
+        })
+        return () => {
+          alive = false
+        }
+      }, [])
+      if (!info || info.ok !== true || info.outdated !== true || !info.latest) return null
+      const url = String(info.pageUrl || '')
+      return h(
+        'section',
+        null,
+        h(
+          'button',
+          {
+            type: 'button',
+            // 点一下去仓库页（自己看版本说明、自己决定装不装），不在插件里偷偷下载
+            onClick: () => {
+              if (url !== '') window.open(url, '_blank')
+            },
+            style: { ...buttonStyle(false), width: '100%', padding: '9px 12px', fontSize: 12 },
+          },
+          `${dict.updateAvailable} v${info.latest}`,
+        ),
+      )
+    }
+
+    /**
+     * 分段控件（模式 / 时长 / 提示音开关都用它）。
+     *
+     * 【2026-10-22 16:4x boss要求界面美化】这里只改**长什么样**：
+     *   原来是四个各自独立的描边按钮并排放，选中项用描边+强调色区分；
+     *   现在是**带底槽的胶囊**：外框一个浅底槽，每项在槽里，选中的那项浮起来
+     *   （白底 + 细边框 + 深字），未选中的是透明底灰字。
+     *
+     * ⚠️ **逻辑一个字没改**：onClick、disabled、aria-pressed 全是原来的。
+     *    「不伤核心功能」靠这个 —— 改完必须跑全量回归。
+     */
     function segment(text, active, onClick, disabled) {      return h(
         'button',
         {
@@ -2871,15 +3208,9 @@ window.__ModuleLoader__.load({
           disabled: Boolean(disabled),
           'aria-pressed': active,
           style: {
-            flex: 1,
-            padding: '7px 4px',
-            fontSize: 11,
+            ...(active ? PANEL_UI.segmentItemOn : PANEL_UI.segmentItem),
             cursor: disabled ? 'default' : 'pointer',
-            borderRadius: 8,
             opacity: disabled ? 0.6 : 1,
-            background: active ? T.raised : 'transparent',
-            border: `1px solid ${active ? T.accent : T.borderStrong}`,
-            color: active ? T.accent : T.secondary,
           },
         },
         text,
@@ -2891,7 +3222,7 @@ window.__ModuleLoader__.load({
      *
      * 为什么这么做:库里 1300+ 张图,以前一次性全画出来每换一张图就要重
      * 1300 个缩略图重画一遍——换图要等十几秒。分页一次60 张也不糊
-     * 作者要的是「选中的时候才渲染」。
+     * boss要的是「选中的时候才渲染」。
      *
      * 这里的做法横着排一条每个格子固定 84px 宽滚动时用 IntersectionObserver
      * 看哪些格子进了可视区,只给这些格子真的去加载图片其余保持空白占位。
@@ -2928,7 +3259,7 @@ window.__ModuleLoader__.load({
 
       // 选中的那张永远要看得见:打开面板就滚到它那儿
       // 【10-18 19:15】原来用 scrollIntoView,它会连外层面板一起滚 ——
-      // 作者一打开面板整块内容就跳一下。现在改成只动图库自己那个滚动框。
+      // boss一打开面板整块内容就跳一下。现在改成只动图库自己那个滚动框。
       // 【10-18 22:05】连着补了两个洞:
       //   ① 滚动框自己设成定位祖先(offsetTop 才有正确基准,见下面 style)
       //   ② 刚打开那一帧格子可能还没排完版,60ms 后再定一次位置
@@ -2953,7 +3284,7 @@ window.__ModuleLoader__.load({
         {
           ref: scrollerRef,
           onScroll: (event) => {
-            // 滚到离底 400px 就自动再放一批进来作者不用一直点「加载更多」
+            // 滚到离底 400px 就自动再放一批进来boss不用一直点「加载更多」
             if (typeof onReachEnd !== 'function') return
             const node = event.currentTarget
             if (node.scrollTop + node.clientHeight + 400 >= node.scrollHeight) onReachEnd()
@@ -3010,7 +3341,7 @@ window.__ModuleLoader__.load({
                   style: { width: '100%', height: '100%', objectFit: 'cover', display: 'block' },
                 })
               : null,
-            // 【10-18 19:15 作者:「选项出来的图片应该默认选中当前背景的这张」】
+            // 【10-18 19:15 boss:「选项出来的图片应该默认选中当前背景的这张」】
             // 光靠一圈描边不够显眼,当前这张再打个勾,一眼就认得出是哪张。
             isActive
               ? h('div', {
@@ -3038,7 +3369,7 @@ window.__ModuleLoader__.load({
       )
     }
 
-    function SkinControls({ compact }) {
+    function SkinControls({ compact, onOpenUpdate }) {
       useSkin()
       const dict = dictFor()
       const entry = currentEntry()
@@ -3072,7 +3403,7 @@ window.__ModuleLoader__.load({
       }, [state.activeId, library.length])
 
       /**
-       * ═══ 新手引导（作者 10-19 21:4x：「针对第一次安装插件的人，就跳出引导来指导他」）═══
+       * ═══ 新手引导（boss 10-19 21:4x：「针对第一次安装插件的人，就跳出引导来指导他」）═══
        *
        * 判断只看**设置读回来了没有** + 存档里的 onboarded：
        *   · 设置还没读回来 → 什么都不做（不然老用户也会被弹一次）
@@ -3108,12 +3439,12 @@ window.__ModuleLoader__.load({
       /**
        * 自定义音效:一次只收一个(提示音就一个,不用批量)。
        * 选完立刻清掉 value —— 不然同一个文件选第二次不触发 onChange,
-       * 作者会以为点了没反应。
+       * boss会以为点了没反应。
        */
       const onSoundFiles = (event) => {
         /**
          * 【10-19 13:55 改批量】原来只取 files[0] ——
-         * 作者一次框选多个,后面的全被静默丢掉。现在整批交给 importSounds。
+         * boss一次框选多个,后面的全被静默丢掉。现在整批交给 importSounds。
          */
         const picked = Array.from(event.target.files || [])
         event.target.value = ''
@@ -3131,9 +3462,9 @@ window.__ModuleLoader__.load({
        * 每换一张图整个面板重画一遍——这就是「换一张要十几秒」的真正原因。
        * 现在只画前shown 张滚到底或者点按钮再往下放一批。
        *
-       * 【10-18 22:05 作者报的第一条,真 bug】作者当前选的那张可能排在几百名开外,
+       * 【10-18 22:05 boss报的第一条,真 bug】boss当前选的那张可能排在几百名开外,
        * 而分页一次只画 60 张 —— 当前图压根没被画出来,
-       * 面板打开自然「回不到」那张(作者 19:15 提过一次,只修了滚动,没修这个)。
+       * 面板打开自然「回不到」那张(boss 19:15 提过一次,只修了滚动,没修这个)。
        * 现在不管 shown 是多少,当前图一定在这批里,而且顺序跟图库一致,
        * 滚动定位才找得到正确的下标。
        */
@@ -3151,9 +3482,9 @@ window.__ModuleLoader__.load({
         { style: { display: 'flex', flexDirection: 'column', gap: 16 } },
 
         /**
-         * ═══ 语言 / Language —— 放在整列最顶上（作者 10-19 21:1x）═══
+         * ═══ 语言 / Language —— 放在整列最顶上（boss 10-19 21:1x）═══
          *
-         * 作者原话：「在悬浮球的选项里面，写一个中英双语版，默认是中文，
+         * boss原话：「在悬浮球的选项里面，写一个中英双语版，默认是中文，
          * 中英双语文字放在最置顶的位置，可以一键切换」
          *
          * 两个按钮都写着**中英两种字**（中文 / Chinese、English / 英文），
@@ -3162,11 +3493,11 @@ window.__ModuleLoader__.load({
          */
         h(
           'section',
-          null,
-          h('div', { style: { fontSize: 12, color: T.secondary, marginBottom: 8 } }, LANG_TEXT.label),
+          { style: { marginBottom: 18 } },
+          panelTitle(LANG_TEXT.label),
           h(
             'div',
-            { style: { display: 'flex', gap: 8 } },
+            { style: PANEL_UI.segmentTrack },
             segment(LANG_TEXT.zh, state.lang !== 'en', () => void setLang('zh')),
             segment(LANG_TEXT.en, state.lang === 'en', () => void setLang('en')),
           ),
@@ -3193,7 +3524,7 @@ window.__ModuleLoader__.load({
 
         /**
          * ═══ 新手引导卡（第一次装的人打开面板第一眼看到的就是它）═══
-         * 位置：语言开关下面、恢复默认上面 —— 语言必须最顶（作者 10-19 21:1x 定的），
+         * 位置：语言开关下面、恢复默认上面 —— 语言必须最顶（boss 10-19 21:1x 定的），
          * 所以引导让一位；它是**可收起来的**，看过就不再自己跳。
          */
         guideOpen
@@ -3228,9 +3559,9 @@ window.__ModuleLoader__.load({
           : null,
 
         /**
-         * ═══ 「恢复默认界面」放到最上面（作者 10-19 18:29 提的）═══
+         * ═══ 「恢复默认界面」放到最上面（boss 10-19 18:29 提的）═══
          *
-         * 作者原话：「悬浮窗选项卡里面，恢复默认放在最上面」。
+         * boss原话：「悬浮窗选项卡里面，恢复默认放在最上面」。
          * 原来这枚按钮吊在面板最底下（音效下面、读数上面），面板一打开
          * 得先滚到底才够得着 —— 现在挪到整列的第一个，开箱就在眼前。
          *
@@ -3239,34 +3570,54 @@ window.__ModuleLoader__.load({
          */
         h(
           'section',
-          null,
+          { style: { marginBottom: 18 } },
+          // 【10-22 08:0x boss选 B】有新版本时，最上面多一行；没有就什么都不显示
+          h(UpdateNotice),
+          /**
+           * 【10-22 08:2x boss】「在换肤悬浮窗上，左边是默认界面，右边是『检查更新』」
+           *   —— 「恢复默认界面」在左，「检查更新」在右（同一行）。
+           *   点「检查更新」**不直接更新**，而是弹出那个新窗口（更新 + 我的项目）。
+           */
           h(
-            'button',
-            {
-              type: 'button',
-              onClick: () => restoreDefaults(),
-              style: { ...buttonStyle(true), width: '100%', padding: '9px 12px', fontSize: 12 },
-            },
-            dict.restore,
+            'div',
+            { style: { display: 'flex', gap: 8 } },
+            h(
+              'button',
+              {
+                type: 'button',
+                onClick: () => restoreDefaults(),
+                style: { ...buttonStyle(true), ...PANEL_UI.button, flex: '1 1 auto' },
+              },
+              dict.restore,
+            ),
+            onOpenUpdate
+              ? h(
+                  'button',
+                  {
+                    type: 'button',
+                    onClick: onOpenUpdate,
+                    style: { ...PANEL_UI.buttonAccent, flex: '0 0 auto' },
+                  },
+                  dict.updateWindowTitle,
+                )
+              : null,
           ),
-          h('div', { style: { marginTop: 6, fontSize: 11, color: T.secondary } }, dict.restoreHint),
+          panelHint(dict.restoreHint),
         ),
 
         // 模式
         h(
           'section',
-          null,
-          h('div', { style: { fontSize: 12, color: T.secondary, marginBottom: 8 } }, dict.mode),
+          { style: PANEL_UI.sectionGap },
+          panelTitle(dict.mode),
           h(
             'div',
-            { style: { display: 'flex', gap: 8 } },
+            { style: PANEL_UI.segmentTrack },
             segment(dict.modeNormal, state.mode === 'normal', () => setMode('normal')),
             segment(dict.modeFocus, state.mode === 'focus', () => setMode('focus')),
             segment(dict.modeLeisure, state.mode === 'leisure', () => setMode('leisure')),
           ),
-          h(
-            'div',
-            { style: { marginTop: 6, fontSize: 11, color: T.secondary } },
+          panelHint(
             state.mode === 'focus'
               ? dict.modeFocusHint
               : state.mode === 'leisure'
@@ -3276,9 +3627,9 @@ window.__ModuleLoader__.load({
         ),
 
         /**
-         * ═══ 背景明度（遮罩深浅）滑杆 —— 10-19 18:5x 作者要回来的 ═══
+         * ═══ 背景明度（遮罩深浅）滑杆 —— 10-19 18:5x boss要回来的 ═══
          *
-         * 作者原话:「你把图片背景的明度、透明度给删掉了,这个版本没有了。你应该加上去的,
+         * boss原话:「你把图片背景的明度、透明度给删掉了,这个版本没有了。你应该加上去的,
          * 要不然我们『休闲』『专注』和『正常』这三个模式都用不了了。」
          *
          * 【为什么它跟模式是一回事】三个模式的定义就是「遮罩压在哪个档」：
@@ -3287,22 +3638,20 @@ window.__ModuleLoader__.load({
          * 点哪个模式屏幕上都一样。控件可以删，语义不能删。
          *
          * 【这次保留 00:56 那条意见的部分】
-         *   · 不恢复「按图片自动」按钮（作者点名不要）；
+         *   · 不恢复「按图片自动」按钮（boss点名不要）；
          *   · 不恢复「遮罩 0 = 背景图最清楚,35 = …」那句长提示（同样点名不要）。
          *
-         * 【10-19 20:2x 作者：「为什么是从 9 开始的」】滑杆左端原来顶着「自动底线」，
+         * 【10-19 20:2x boss：「为什么是从 9 开始的」】滑杆左端原来顶着「自动底线」，
          * 于是写着 0~40、实际从 9 拖起。现在左端就是 **0**，底线降级成下面那行小字提示。
          */
         h(
           'section',
-          null,
+          { style: PANEL_UI.sectionGap },
+          panelTitle(dict.wash),
           h(
             'div',
-            { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 } },
-            h('span', { style: { fontSize: 12, color: T.primary } }, dict.wash),
-            h(
-              'span',
-              { style: { fontSize: 12, color: T.secondary } },
+            { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 } },
+            h('span', { style: { fontSize: 12, fontWeight: 600, color: T.accent } },
               locked ? `${wash}%（${dict.washLocked}）` : `${wash}%`,
             ),
           ),
@@ -3320,9 +3669,7 @@ window.__ModuleLoader__.load({
             onBlur: () => flushWash(),
             style: { width: '100%', opacity: locked ? 0.5 : 1, cursor: locked ? 'not-allowed' : 'pointer' },
           }),
-          h(
-            'div',
-            { style: { marginTop: 6, fontSize: 11, color: T.secondary } },
+          panelHint(
             entry && floorPct > 0
               ? `${dict.washFloor.replace('{n}', String(floorPct))} · 0 = 背景图最清楚`
               : '0 = 背景图最清楚,数值越大背景压得越实、字越清楚',
@@ -3332,30 +3679,33 @@ window.__ModuleLoader__.load({
         // 图库
         h(
           'section',
-          null,
+          { style: PANEL_UI.sectionGap },
           h(
             'div',
-            { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 } },
-            h('span', { style: { fontSize: 12, color: T.secondary } }, dict.gallery),
+            { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 } },
+            panelTitle(dict.gallery),
             h(
               'span',
               { style: { fontSize: 11, color: T.secondary } },
               library.length > 0 ? dict.galleryCount.replace('{n}', String(library.length)) : '',
             ),
           ),
-          // 【10-18 20:45 作者同意 A:手动换一张】不用等自动轮换,点一下就抽下一张
+          // 【10-18 20:45 boss同意 A:手动换一张】→【10-22 20:1x 改成「下一张」】
+          //   原来这里调 `pickRandomImageId()`（**随机**抽），跟下面「背景图片随机变换时间」
+          //   是同一套随机逻辑 —— 两个入口干同一件事。boss明确要的是**按图库顺序走下一张**。
+          //   随机那套还留在下面（自动轮换仍然随机，符合它的本意）。
           library.length > 1
             ? h(
                 'button',
                 {
                   type: 'button',
                   onClick: () => {
-                    const next = pickRandomImageId()
+                    const next = pickNextImageId()
                     if (next) void selectImage(next)
                   },
                   style: { ...buttonStyle(), width: '100%', marginBottom: 8, fontSize: 12 },
                 },
-                dict.pickRandom,
+                dict.pickNext,
               )
             : null,
           library.length === 0
@@ -3417,11 +3767,11 @@ window.__ModuleLoader__.load({
         // 背景图片随机变换时间
         h(
           'section',
-          null,
-          h('div', { style: { fontSize: 12, color: T.secondary, marginBottom: 8 } }, dict.rotate),
+          { style: PANEL_UI.sectionGap },
+          panelTitle(dict.rotate),
           h(
             'div',
-            { style: { display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' } },
+            { style: { ...PANEL_UI.segmentTrack, flexWrap: 'wrap' } },
             segment(dict.rotateOff, state.rotateMinutes === 0, () => {
               setCustomMode(false)
               setRotateMinutes(0)
@@ -3478,12 +3828,12 @@ window.__ModuleLoader__.load({
         entry && entry.portrait
           ? h(
               'section',
-              null,
-              h('div', { style: { fontSize: 12, color: T.secondary, marginBottom: 8 } }, dict.portraitFill),
+              { style: PANEL_UI.sectionGap },
+              panelTitle(dict.portraitFill),
               h(
                 'div',
-                { style: { display: 'flex', gap: 8, flexWrap: 'wrap' } },
-                // 居中排第一:它是竖图最合理的默认,也是作者要的那档
+                { style: { ...PANEL_UI.segmentTrack, flexWrap: 'wrap' } },
+                // 居中排第一:它是竖图最合理的默认,也是boss要的那档
                 // 「原图」排第一:竖图默认这档,按原图像素显示不放大
                 segment(dict.fillNative, entry.fillMode === 'native', () => setFillMode('native')),
                 segment(dict.fillCenter, entry.fillMode === 'center', () => setFillMode('center')),
@@ -3491,20 +3841,20 @@ window.__ModuleLoader__.load({
                 segment(dict.fillBlur, entry.fillMode === 'blur', () => setFillMode('blur')),
                 segment(dict.fillRight, entry.fillMode === 'right', () => setFillMode('right')),
               ),
-              h('div', { style: { marginTop: 6, fontSize: 11, color: T.secondary } }, dict.portraitHint),
+              panelHint(dict.portraitHint),
               /**
-               * 【10-18 20:45 作者同意 D:竖图两侧那层模糊过渡做成可调的】
+               * 【10-18 20:45 boss同意 D:竖图两侧那层模糊过渡做成可调的】
                * 只有竖图才有这层(横图是整屏铺满,压根没这一层),所以跟着竖图出来。
                * 拉到 0 = 干脆撤掉这层,两侧露干净的底色。
                */
               h(
                 'div',
-                { style: { marginTop: 12 } },
+                { style: { marginTop: 14 } },
                 h(
                   'div',
-                  { style: { display: 'flex', justifyContent: 'space-between', fontSize: 12, color: T.secondary, marginBottom: 6 } },
-                  h('span', null, dict.bleedLabel),
-                  h('span', null, state.bleed > 0 ? dict.bleedValue.replace('{n}', String(state.bleed)) : dict.bleedOff),
+                  { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 } },
+                  h('span', { style: { fontSize: 12, fontWeight: 600, color: T.primary } }, dict.bleedLabel),
+                  h('span', { style: { fontSize: 12, fontWeight: 600, color: T.accent } }, state.bleed > 0 ? dict.bleedValue.replace('{n}', String(state.bleed)) : dict.bleedOff),
                 ),
                 h('input', {
                   type: 'range',
@@ -3520,47 +3870,51 @@ window.__ModuleLoader__.load({
           : null,
 
         /**
-         * 【10-18 22:05 作者】「悬浮窗里就不要有选项了,直接删掉」
+         * 【10-18 22:05 boss】「悬浮窗里就不要有选项了,直接删掉」
          * 文字颜色那一栏(深色文字/浅色文字两个按钮)整个删掉了 ——
          * 「你图片判断默认是深色字体,开进来就应该是深色字体;判断默认是浅色字体,起来就应该是浅色字体」。
-         * 也就是说:判什么就显示什么,中间调那档按 21:30 定的标准交给主题,不再让作者手动拧。
+         * 也就是说:判什么就显示什么,中间调那档按 21:30 定的标准交给主题,不再让boss手动拧。
          *
          * 后端对 state.text 的 'dark'/'light' 仍然认(老存档里可能存着手动值),
          * 只是界面上不再有入口 —— 换句话说从这一刻起字色只由图片明度决定。
          */
 
         /**
-         * ═══ 提示音开关(作者 10-18 23:45 选 A)═══
-         * 一栏:开关 + 音量 + 试听。默认关 —— 这版刚稳,先不吵作者。
+         * ═══ 提示音开关(boss 10-18 23:45 选 A)═══
+         * 一栏:开关 + 音量 + 试听。默认关 —— 这版刚稳,先不吵boss。
          * 「试听」那一按同时把浏览器的发声授权拿到手,之后自动响才不会被拦。
          */
         h(
           'section',
-          null,
-          h('div', { style: { fontSize: 12, color: T.secondary, marginBottom: 8 } }, dict.soundLabel),
+          { style: PANEL_UI.sectionGap },
+          panelTitle(dict.soundLabel),
           h(
             'div',
             { style: { display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' } },
-            segment(dict.soundOnLabel, state.soundOn === true, () => setSoundOn(true)),
-            segment(dict.soundOffLabel, state.soundOn !== true, () => setSoundOn(false)),
+            h(
+              'div',
+              { style: { ...PANEL_UI.segmentTrack, flex: '1 1 auto', minWidth: 160 } },
+              segment(dict.soundOnLabel, state.soundOn === true, () => setSoundOn(true)),
+              segment(dict.soundOffLabel, state.soundOn !== true, () => setSoundOn(false)),
+            ),
             h(
               'button',
               {
                 type: 'button',
                 onClick: () => testChime(),
-                style: { ...buttonStyle(), padding: '4px 9px', fontSize: 11 },
+                style: { ...buttonStyle(), ...PANEL_UI.button, padding: '7px 14px', fontSize: 12 },
               },
               dict.soundTest,
             ),
           ),
           h(
             'div',
-            { style: { marginTop: 10 } },
+            { style: { marginTop: 12 } },
             h(
               'div',
-              { style: { display: 'flex', justifyContent: 'space-between', fontSize: 12, color: T.secondary, marginBottom: 6 } },
-              h('span', null, dict.soundVolumeLabel),
-              h('span', null, Math.round(state.soundVolume * 100) + '%'),
+              { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 } },
+              h('span', { style: { fontSize: 12, fontWeight: 600, color: T.primary } }, dict.soundVolumeLabel),
+              h('span', { style: { fontSize: 12, fontWeight: 600, color: T.accent } }, Math.round(state.soundVolume * 100) + '%'),
             ),
             h('input', {
               type: 'range',
@@ -3572,12 +3926,12 @@ window.__ModuleLoader__.load({
               style: { width: '100%' },
             }),
           ),
-          h('div', { style: { marginTop: 6, fontSize: 11, color: T.secondary } }, dict.soundHint),
+          panelHint(dict.soundHint),
           /**
-           * ═══ 自定义音效(作者 10-19 00:20:「你给一个添加的窗口」)═══
-           * 「添加」按钮点下去弹一个本地选文件框 —— 这就是作者要的那个窗口。
+           * ═══ 自定义音效(boss 10-19 00:20:「你给一个添加的窗口」)═══
+           * 「添加」按钮点下去弹一个本地选文件框 —— 这就是boss要的那个窗口。
            * 选中的音效列表列在下面,每条带「用这个 / 删掉」。
-           * 空列表时显示一句提示,免得作者以为坏了。
+           * 空列表时显示一句提示,免得boss以为坏了。
            */
           h(
             'div',
@@ -3588,7 +3942,7 @@ window.__ModuleLoader__.load({
               accept: 'audio/*',
               /**
                * 【10-19 13:55】multiple 是批量添加的开关 —— 原来这里没有,
-               * 作者框选多个只能进去第一个。加上它,再配合 onSoundFiles 逐个上传。
+               * boss框选多个只能进去第一个。加上它,再配合 onSoundFiles 逐个上传。
                */
               multiple: true,
               onChange: onSoundFiles,
@@ -3605,7 +3959,7 @@ window.__ModuleLoader__.load({
             ),
             /**
              * 【10-19 01:00】添加失败时把那句明话显示在这儿。
-             * 作者报过「自定义音效用不了,添加不上去」—— 原因之一就是
+             * boss报过「自定义音效用不了,添加不上去」—— 原因之一就是
              * 失败被静默吞了,面板上一点动静都没有,看着像点了没反应。
              * 【13:55 又补】批量添加之后这句要能显示「成功几个、失败几个」——
              * 成功时不再用红字(红字只留给真的没进去)。
@@ -3615,7 +3969,7 @@ window.__ModuleLoader__.load({
               : null,
             /**
              * 【10-19 13:55】容量那一行:已用 / 上限、条数 / 条数上限。
-             * 作者问过「总文件多大」—— 把这两个数直接摆在面板上,
+             * boss问过「总文件多大」—— 把这两个数直接摆在面板上,
              * 加了几个、还剩多少空间一眼就看得到,不用再来问。
              */
             h(
@@ -3695,7 +4049,7 @@ window.__ModuleLoader__.load({
         ),
 
         // 【10-19 18:29】「恢复默认界面」原来在这儿（面板最底下）——
-        // 作者要求挪到最上面，已经搬走了，见 SkinControls 开头那一段。
+        // boss要求挪到最上面，已经搬走了，见 SkinControls 开头那一段。
         // 这里只留一句注释，免得下一个人以为它丢了。
 
         // 这张图的读数
@@ -3729,10 +4083,544 @@ window.__ModuleLoader__.load({
       )
     }
 
+    // ── 彩蛋:渠道限流毛玻璃贴纸 ───────────────────────────
+    /**
+     * 【2026-10-20 boss】把「渠道限流」做成悬浮球旁边的一张毛玻璃贴纸。
+     *
+     * boss的三条硬要求（原话照抄）：
+     *   1. 不写任何使用说明
+     *   2. 不写任何引导文字
+     *   3. 不做功能上的相关介绍
+     *   —— **但有相关代码**
+     * 所以这个组件**一个说明字都不往界面上放**：
+     * 没有标题、没有「怎么用」、没有 tooltip、没有空状态文案。
+     * 贴纸上只有数据本身。
+     *
+     * 交互（boss原话）：
+     *   「单击悬浮窗 3 次让它浮现，再单击 3 次让它关闭；
+     *     或者在右上角设置一个『叉』，点击即可关闭」
+     *
+     * 为什么数据不自己算：主机端已经把「还在限流 / 已到期」判好了
+     * （判据是解禁时刻），页面只负责画 —— 两边各算一套必然对不上。
+     */
+
+    /**
+     * ═══ 贴纸摆哪儿（纯函数，单独拎出来是为了能真跑一遍验证）═══
+     *
+     * 【2026-10-21 19:0x boss】三条要求（照抄原话）：
+     *   1. 「贴纸离桌面悬浮图标太远了，基本上要靠得比较近」
+     *   2. 「根据悬浮图标所处的桌面位置，贴纸可以自动切换位置，让它完整显现」
+     *   3. 「千万不能超出屏幕」
+     *
+     * 上一版为什么不行（boss 10-21 截图就是那个样子）：
+     *   ① 纵向摆法是「贴纸整块甩到球的上面 / 下面」——
+     *      球在屏幕下沿时，贴纸被顶到屏幕最上角，离球十万八千里。
+     *   ② 贴纸的宽高是**估的**（写死 300×300），真身可能更高，
+     *      估小了就会顶出屏幕外。
+     *
+     * 现在的做法：
+     *   - 优先**横着贴**：球的左边放不下就右边放，**纵向上跟球对齐**
+     *     （不是整块甩到球上面去）→ 贴纸跟球之间只隔 12px。
+     *   - 横着放不下才改成上下（这时才整块摆到球的上 / 下方）。
+     *   - 宽高用**量出来的真实尺寸**（调用方先量贴纸自己），
+     *     最后统一夹在屏幕内 —— 一定完整显示，绝不出界。
+     *
+     * @param ball  球在视口里的位置 {left,right,top,bottom,width,height}
+     * @param box   贴纸自己的真实尺寸 {width,height}
+     * @param view  视口 {width,height}
+     */
+    function placeSticker(ball, box, view) {
+      const vw = Math.max(1, (view && view.width) || 0)
+      const vh = Math.max(1, (view && view.height) || 0)
+      const gap = 12 // 贴纸跟球之间留的空 —— boss要「靠得比较近」
+      const margin = 10 // 贴纸离屏幕边至少留这么多
+      // 贴纸的真实宽高（量出来的）；再兜一层：再大也不许超过屏幕
+      const w = Math.min(Math.max(1, (box && box.width) || 300), Math.max(1, vw - margin * 2))
+      const h = Math.min(Math.max(1, (box && box.height) || 120), Math.max(1, vh - margin * 2))
+      const cx = ball.left + ball.width / 2
+      const cy = ball.top + ball.height / 2
+      // 四个候选：横着贴优先（0 左 / 1 右），上下兜底（2 上 / 3 下）
+      const candidates = [
+        { left: ball.left - gap - w, top: cy - h / 2 },
+        { left: ball.right + gap, top: cy - h / 2 },
+        { left: cx - w / 2, top: ball.top - gap - h },
+        { left: cx - w / 2, top: ball.bottom + gap },
+      ]
+      // 球在右半 → 先往左摆；球在左半 → 先往右摆
+      // 球在下半 → 先往上摆；球在上半 → 先往下摆
+      const order = [
+        cx > vw / 2 ? 0 : 1,
+        cx > vw / 2 ? 1 : 0,
+        cy > vh / 2 ? 2 : 3,
+        cy > vh / 2 ? 3 : 2,
+      ]
+      const fits = (c) => c.left >= margin && c.left + w <= vw - margin && c.top >= margin && c.top + h <= vh - margin
+      for (let i = 0; i < order.length; i += 1) {
+        const c = candidates[order[i]]
+        if (fits(c)) return { left: c.left, top: c.top, side: order[i] }
+      }
+      // 都放不下（屏幕太小）→ 夹在屏幕内：宁可离球远一点，也不能出界
+      const c = candidates[order[0]]
+      return {
+        left: Math.max(margin, Math.min(c.left, Math.max(margin, vw - w - margin))),
+        top: Math.max(margin, Math.min(c.top, Math.max(margin, vh - h - margin))),
+        side: order[0],
+      }
+    }
+
+    /**
+     * ═══ 悬浮球的安全位置（纯函数，能真跑验证）═══
+     *
+     * 【10-22 01:1x 全功能自检抓出来的真 bug】
+     *   boss在宽屏把球拖到右边，再把窗口拖窄 —— 球的 left 还是按宽屏算的旧值，
+     *   **球就跑到屏幕外看不见了**，只能把窗口再拖回来找它。
+     *   启动时会夹一次，但运行中窗口变了没人管。这个函数就是那一份夹紧逻辑，
+     *   启动、窗口 resize 都用它，避免两处各写一套又漂。
+     */
+    function clampBallXY(x, y, vw, vh) {
+      const size = 56 // 球是 56×56
+      const nx = Number(x)
+      const ny = Number(y)
+      return {
+        x: Math.max(0, Math.min(Number.isFinite(nx) ? nx : 0, Math.max(0, vw - size))),
+        y: Math.max(0, Math.min(Number.isFinite(ny) ? ny : 0, Math.max(0, vh - size))),
+      }
+    }
+
+    function ChannelLimitSticker({ visible, onClose, ballRect }) {
+      const [items, setItems] = useState([])
+      const [loaded, setLoaded] = useState(false)
+      /**
+       * 【10-21 22:2x boss】「有些模型已经报 429 错误或者接口不可用了，但贴纸里并没有记录」
+       * → 表二：今天**真报过错 / 真用不了**的模型（判据在主机端，页面只画）。
+       *   boss划了边界：「我们自己手动停用的不用写出来」——
+       *   所以这张表里不会有"光被禁用、今天没调过"的模型。
+       */
+      const [unavailable, setUnavailable] = useState([])
+      // 【10-20 22:3x boss】模型太多时只显示 10 条，剩下折叠起来
+      const [expanded, setExpanded] = useState(false)
+      // 【10-21 22:2x boss】表二（不可用）单独一套折叠计数
+      const [unfolded, setUnfolded] = useState(false)
+      // 【10-21 19:0x boss】贴纸要「靠得比较近」——
+      //   做法：**先量自己，再摆自己**。量出来的真实宽高喂给 placeSticker 算坐标，
+      //   免得内容一变高、或者球被拖到屏幕边上，贴纸就被顶出屏幕外。
+      const boxRef = useRef(null)
+      const [pos, setPos] = useState(null)
+      // 视口尺寸：贴纸自己的宽高上限要跟着屏幕走（屏幕窄了贴纸也得窄）
+      const [view, setView] = useState(() => ({
+        width: (typeof window !== 'undefined' && window.innerWidth) || 0,
+        height: (typeof window !== 'undefined' && window.innerHeight) || 0,
+      }))
+
+      /**
+       * 【10-20 22:5x boss】「如果时间刷新到这里解禁了，它就不会在上面显示了，是吗」
+       * → 是，而且要**到点就消失**，不能等下一次拉数据。
+       *
+       * 为什么要单独一个心跳：拉数据是每 30 秒一次（问主机端要台账快照），
+       * 但「某条到点解禁」是**按分钟**甚至**按秒**发生的。
+       * 只靠拉数据的话，最坏情况一条已经解禁 30 秒了还挂在那儿亮着红点。
+       * 所以另加一个**每秒心跳**，只干一件事：到点就重画，让那行自己消失。
+       * 它不请求任何东西，开销可以忽略。
+       */
+      const [nowTick, setNowTick] = useState(0)
+      useEffect(() => {
+        if (!visible) return undefined
+        const timer = setInterval(() => setNowTick((n) => n + 1), 1000)
+        return () => clearInterval(timer)
+      }, [visible])
+
+      useEffect(() => {
+        if (!visible) {
+          setLoaded(false)
+          return undefined
+        }
+        let alive = true
+        // 贴纸一开就去问一次；开着的时候每 30 秒再问一次（台账那边 15 分钟一刷新）
+        const pull = async () => {
+          try {
+            const data = await getJson(CHANNEL_LIMITS_PATH)
+            if (!alive) return
+            const list = Array.isArray(data?.items) ? data.items : []
+            setItems(list)
+            /**
+             * 【10-21 22:2x boss】表二：今天真报过错 / 用不了的模型。
+             * 判据全在主机端（"今天真失败过"才算，光被禁用不算），页面只管画。
+             */
+            setUnavailable(Array.isArray(data?.unavailable) ? data.unavailable : [])
+          } catch {
+            if (!alive) return
+            // 读不到就当没有 —— 贴纸空着，不报错、不挡界面
+            setItems([])
+            setUnavailable([])
+          } finally {
+            if (alive) setLoaded(true)
+          }
+        }
+        void pull()
+        const timer = setInterval(pull, 30000)
+        return () => {
+          alive = false
+          clearInterval(timer)
+        }
+      }, [visible])
+
+      // 视口变了就更新（贴纸的宽高上限跟着屏幕走，屏幕窄了贴纸也得窄）
+      useEffect(() => {
+        const onResize = () => setView({
+          width: window.innerWidth || 0,
+          height: window.innerHeight || 0,
+        })
+        window.addEventListener('resize', onResize)
+        return () => window.removeEventListener('resize', onResize)
+      }, [])
+
+      /**
+       * 【10-21 19:0x boss】贴纸摆哪儿 —— 三条要求一起满足：
+       *   1. 「贴纸离桌面悬浮图标太远了，基本上要靠得比较近」
+       *   2. 「根据悬浮图标所处的桌面位置，贴纸可以自动切换位置，让它完整显现」
+       *   3. 「千万不能超出屏幕」
+       *
+       * 做法：量自己的真实宽高 → 交给 placeSticker 算坐标 → 摆过去。
+       * 什么情况下要重摆：
+       *   - 球被拖走了（ballRect 变了）
+       *   - 窗口大小变了
+       *   - 行数变了 / 展开了折叠（内容高度变了）
+       *   - 某一行到点自己消失（高度变了）→ ResizeObserver 兜住
+       */
+      useEffect(() => {
+        if (!visible || !ballRect) {
+          setPos(null)
+          return undefined
+        }
+        const place = () => {
+          const node = boxRef.current
+          if (!node) return
+          const rect = node.getBoundingClientRect()
+          const next = placeSticker(
+            ballRect,
+            { width: rect.width, height: rect.height },
+            { width: window.innerWidth || 0, height: window.innerHeight || 0 },
+          )
+          setPos((was) => (was && was.left === next.left && was.top === next.top ? was : next))
+        }
+        place()
+        window.addEventListener('resize', place)
+        let ro = null
+        if (typeof ResizeObserver !== 'undefined' && boxRef.current) {
+          ro = new ResizeObserver(() => place())
+          ro.observe(boxRef.current)
+        }
+        return () => {
+          window.removeEventListener('resize', place)
+          if (ro) ro.disconnect()
+        }
+      }, [visible, ballRect, expanded, items.length])
+
+      if (!visible) return null
+
+      /**
+       * 【10-20 22:5x boss】「如果时间刷新到这里解禁了，它就不会在上面显示了，是吗」
+       * → boss的预期是**到期就从贴纸上消失**。
+       *
+       * ⚠️ 上一版是「到期的还显示，只是变暗排到下面」—— 跟boss的预期不一致。
+       *    现在改成：**只显示还在限流的**，到期的直接不出现。
+       *    贴纸的意义是「现在有什么在挡路」，已经解禁的不该占位置。
+       *
+       * 这里自己按解禁时刻再判一次，不完全信主机端给的 `live`：
+       * 主机端那一次判断是「请求到达那一刻」的，贴纸开着的时候时间会走，
+       * 所以每 30 秒拉一次数据之外，**渲染时按当前时刻再判一次**，
+       * 才不会出现「已经过了解禁时刻还亮着红点」。
+       */
+      const nowMs = Date.now()
+      // nowTick 是那个每秒心跳的计数 —— 它一变就重画，
+      // 于是「刚到解禁时刻」的那一行会在一秒内自己消失。
+      // 这里显式引用它一下，免得它在下面被当成没用到的变量。
+      void nowTick
+      const live = items.filter((item) => Number(item.resetMs) > nowMs)
+      // 【10-20 22:5x boss】超过 10 条就折叠，点「展开」看全部，「收起」收回来
+      const COLLAPSED_COUNT = 10
+      const canFold = live.length > COLLAPSED_COUNT
+      const visibleRows = expanded || !canFold ? live : live.slice(0, COLLAPSED_COUNT)
+
+      return h(
+        'div',
+        {
+          ref: boxRef,
+          style: {
+            position: 'fixed',
+            left: pos?.left ?? 0,
+            top: pos?.top ?? 0,
+            // 屏幕窄了贴纸也跟着窄,绝不出界。
+            // ⚠️ 别写成 Math.min(300, Math.max(120, vw-20)) —— 下限 120 在极窄屏上
+            //    反而比屏幕还宽,又会顶出界。这里**不设下限**,只跟屏幕走:
+            //    屏幕多窄贴纸就多窄 —— boss要的是「千万不能超出屏幕」,
+            //    窄到极端宁可变窄,也不许出界。
+            width: Math.max(1, Math.min(300, (view.width || 300) - 20)),
+            // 屏幕矮了贴纸也跟着矮(内容多的时候内部滚动)
+            maxHeight: Math.max(1, Math.min(380, (view.height || 380) - 20)),
+            overflowY: 'auto',
+            padding: '14px 12px 12px',
+            borderRadius: 16,
+            // 毛玻璃:贴纸的质感靠这两行 —— 效果维持,不动。
+            // 【10-20 22:3x boss】"透明度你得更清晰一点" ——
+            //   上一版底色 0.42 太厚,毛玻璃被压成灰蒙蒙一块,字都发闷。
+            //   现在底色更薄(0.26)、模糊更足(28px)、饱和更高(1.9)，
+            //   透得出后面的东西,字才立得住。
+            backdropFilter: 'blur(28px) saturate(1.9)',
+            WebkitBackdropFilter: 'blur(28px) saturate(1.9)',
+            // 【10-21 19:0x boss】「贴纸里面的文字采用黑色加亮加粗的形式显示（白色不太清楚）」
+            //   根因:底色压得深、字是白的,浅色背景上白字糊成一片。
+            //   改法:底色从「深色半透」翻成「浅色半透」,字改近黑加粗 —— 毛玻璃质感不动。
+            background: 'rgba(255, 255, 255, 0.62)',
+            border: '1px solid rgba(255, 255, 255, 0.75)',
+            boxShadow: '0 10px 40px rgba(0, 0, 0, 0.22)',
+            color: '#12151b',
+            // 位置还没算出来之前先藏着,别在屏幕左上角闪一下
+            visibility: pos ? 'visible' : 'hidden',
+            pointerEvents: 'auto',
+            zIndex: 2147483001,
+          },
+        },
+        // 右上角那个「叉」—— 点一下直接关。
+        // 【10-20 22:3x boss】「应该是一个红框里面带一个黑色的叉，
+        //   或者红框里面带一个白色的叉，这样看得清楚一点。」
+        //   选红框 + 黑叉：红是唯一在整块灰玻璃上跳出来的颜色，一眼就找得到。
+        h(
+          'button',
+          {
+            type: 'button',
+            'aria-label': '×',
+            onClick: onClose,
+            style: {
+              position: 'absolute',
+              // 【10-21 19:0x boss】「红色的叉跟上面的表格表头重叠在一起了,这里要去区分一下」
+              //   改法:叉缩到 22、挪到右上角、外面套一圈白环；
+              //   表头那边再让出右侧 32px(见下面表头的 paddingRight)——
+              //   两边都不动,「解禁」那列就不会再被压住。
+              right: 8,
+              top: 8,
+              width: 22,
+              height: 22,
+              padding: 0,
+              border: '2px solid #f43146',
+              borderRadius: 11,
+              background: '#f43146',
+              color: '#14161a',
+              fontSize: 14,
+              fontWeight: 700,
+              lineHeight: '16px',
+              textAlign: 'center',
+              cursor: 'pointer',
+              // 白环:红叉压在浅玻璃上不再跟表头糊成一片
+              boxShadow: '0 0 0 2px rgba(255, 255, 255, 0.92), 0 2px 8px rgba(0, 0, 0, 0.28)',
+            },
+          },
+          '×',
+        ),
+        // 【10-20 22:5x boss】加一个表头。
+        //   三列：渠道 / 模型 / 解禁。
+        //   ⚠️ 表头也属于「数据的一部分」，不是使用说明 ——
+        //   boss要的是「不写使用说明、不写引导文字」，
+        //   而列名是让人看懂这一行在说什么用的，不写反而看不懂。
+        h(
+          'div',
+          {
+            style: {
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '0 0 6px',
+              marginBottom: 2,
+              fontSize: 11,
+              // 【10-21 19:0x boss】表头文字也改黑、加粗
+              fontWeight: 700,
+              color: '#1b1f27',
+              borderBottom: '1px solid rgba(18, 21, 27, 0.16)',
+              // 跟下面每行的排版对齐：圆点 6 + 间距 8 → 文字从 14 开始
+              paddingLeft: 14,
+              // 【10-21 19:0x boss】「红色的叉跟上面的表格表头重叠在一起了」
+              //   → 右侧让出 32px(叉在右上角占的就是这 32px),「解禁」那列不再被压住
+              paddingRight: 32,
+            },
+          },
+          h('span', { style: { flex: '0 0 auto', width: 96 } }, '渠道'),
+          h('span', { style: { flex: '1 1 auto', minWidth: 0 } }, '模型'),
+          h('span', { style: { flex: '0 0 auto' } }, '解禁'),
+        ),
+        // 一条都不剩（全都解禁了）→ 只留表头，不再列行
+        visibleRows.length === 0
+          ? null
+          : visibleRows.map((item) =>
+              h(
+                'div',
+                {
+                  key: item.key,
+                  style: {
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    padding: '5px 0',
+                    fontSize: 12,
+                    lineHeight: 1.5,
+                    // 【10-21 19:0x boss】浅底色上,分隔线要跟着压深一点才看得出分行
+                    borderBottom: '1px solid rgba(18, 21, 27, 0.12)',
+                  },
+                },
+                // 限流中的红点
+                h('span', {
+                  style: {
+                    width: 6,
+                    height: 6,
+                    borderRadius: 3,
+                    flex: '0 0 auto',
+                    background: '#f43146',
+                    boxShadow: '0 0 6px rgba(244, 49, 70, 0.85)',
+                  },
+                }),
+                h('span', { style: { flex: '0 0 auto', color: 'rgba(18, 21, 27, 0.72)', fontWeight: 600, maxWidth: 96, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, item.channel),
+                // 【10-20 22:3x boss】「模型应该是有名称的」——
+                //   显示主机端查到的**真名**（Qwen3.8-Flash · 免费 那种），
+                //   不是台账里的内部代号（qfmodel）。
+                //   主机端查不到时退回代号（那边已经兜好了），这里不猜。
+                h('span', {
+                  style: {
+                    flex: '1 1 auto',
+                    minWidth: 0,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    // 【10-21 19:0x boss】文字改黑色加亮加粗
+                    color: '#12151b',
+                    fontWeight: 700,
+                  },
+                }, item.modelName || item.model),
+                h('span', {
+                  style: {
+                    flex: '0 0 auto',
+                    color: '#2a3038',
+                    fontWeight: 600,
+                    fontVariantNumeric: 'tabular-nums',
+                    fontSize: 11,
+                  },
+                }, item.resetAt.slice(5, 16)),
+              ),
+            ),
+        // 折叠/展开（boss：「剩下的走下拉框，用『展开』和『收起』来表示」）
+        canFold
+          ? h(
+              'button',
+              {
+                type: 'button',
+                onClick: () => setExpanded((was) => !was),
+                style: {
+                  display: 'block',
+                  width: '100%',
+                  marginTop: 8,
+                  padding: '4px 0',
+                  border: 'none',
+                  background: 'transparent',
+                  // 【10-21 19:0x boss】折叠按钮也跟着改成深色加粗
+                  color: '#1b1f27',
+                  fontWeight: 600,
+                  fontSize: 12,
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                },
+              },
+              expanded ? '收起' : `展开（还有 ${live.length - COLLAPSED_COUNT} 条）`,
+            )
+          : null,
+        // ═══ 表二：不可用（【10-21 22:2x boss】）═══════════════════
+        // boss原话：「如果不是解禁的话，你就再起一个表头，写上『不可用』或者『禁用』」
+        // 边界（boss亲口划的）：「我们自己手动停用的不用写出来」——
+        //   所以这里只放**今天真报过错/真用不了**的，光被禁用、今天没调过的不出现。
+        unavailable.length === 0
+          ? null
+          : h(
+              'div',
+              { style: { marginTop: 10, paddingTop: 8, borderTop: '1px solid rgba(18, 21, 27, 0.2)' } },
+              h(
+                'div',
+                {
+                  style: {
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    padding: '0 0 6px',
+                    marginBottom: 2,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: '#1b1f27',
+                    borderBottom: '1px solid rgba(18, 21, 27, 0.16)',
+                    paddingLeft: 14,
+                  },
+                },
+                h('span', { style: { flex: '0 0 auto', width: 96 } }, '渠道'),
+                h('span', { style: { flex: '1 1 auto', minWidth: 0 } }, '模型'),
+                h('span', { style: { flex: '0 0 auto' } }, '不可用'),
+              ),
+              (unfolded ? unavailable : unavailable.slice(0, COLLAPSED_COUNT)).map((row) =>
+                h(
+                  'div',
+                  {
+                    key: `u:${row.key}`,
+                    style: {
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '5px 0',
+                      fontSize: 12,
+                      lineHeight: 1.5,
+                      borderBottom: '1px solid rgba(18, 21, 27, 0.12)',
+                    },
+                  },
+                  // 红点 = 报错了没恢复；灰点 = 已经被禁用
+                  h('span', {
+                    style: {
+                      width: 6,
+                      height: 6,
+                      borderRadius: 3,
+                      flex: '0 0 auto',
+                      background: row.disabled ? '#6b7280' : '#f43146',
+                      boxShadow: row.disabled ? 'none' : '0 0 6px rgba(244, 49, 70, 0.85)',
+                    },
+                  }),
+                  h('span', { style: { flex: '0 0 auto', color: 'rgba(18, 21, 27, 0.72)', fontWeight: 600, maxWidth: 96, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, row.channel),
+                  h('span', { style: { flex: '1 1 auto', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#12151b', fontWeight: 700 } }, row.modelName || row.model),
+                  h('span', { style: { flex: '0 0 auto', maxWidth: 108, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: row.disabled ? '#4b5563' : '#a5212c', fontWeight: 600, fontSize: 11 } }, row.reason),
+                ),
+              ),
+              unavailable.length > COLLAPSED_COUNT
+                ? h(
+                    'button',
+                    {
+                      type: 'button',
+                      onClick: () => setUnfolded((was) => !was),
+                      style: {
+                        display: 'block',
+                        width: '100%',
+                        marginTop: 8,
+                        padding: '4px 0',
+                        border: 'none',
+                        background: 'transparent',
+                        color: '#1b1f27',
+                        fontWeight: 600,
+                        fontSize: 12,
+                        cursor: 'pointer',
+                        textAlign: 'center',
+                      },
+                    },
+                    unfolded ? '收起' : `展开（还有 ${unavailable.length - COLLAPSED_COUNT} 条）`,
+                  )
+                : null,
+            ),
+      )
+    }
+
     // ── 入口一:右下角可拖动圆钮 ───────────────────────────
     function Launcher() {
       const dict = dictFor()
-      // 【作者 10-18 15:07 第一个问题】壁纸是这个组件渲染的,但原来没订阅换肤状态。
+      // 【boss 10-18 15:07 第一个问题】壁纸是这个组件渲染的,但原来没订阅换肤状态。
       // 选图后 refreshBackground() 已经把新壁纸算好了、也 notify 了,
       // 可这个组件没订阅,所以不重画 —— 屏幕上还是旧图。
       // 关掉面板之所以会换,是因为 setOpen 触发了重渲染,壁纸顺带刷出来。
@@ -3743,13 +4631,18 @@ window.__ModuleLoader__.load({
       const [place, setPlace] = useState(null)
       const [hot, setHot] = useState(false)
       const [hintBelow, setHintBelow] = useState(true)
+      // 【10-20 22:1x 彩蛋】渠道限流贴纸:单击三次浮现,再单击三次收起。
+      // 界面上不写任何说明字(boss要求),只有这张贴纸本身。
+      const [stickerOpen, setStickerOpen] = useState(false)
+      // 【10-22 08:2x boss】点「检查更新」弹出的那个新窗口（更新 + 我的项目）
+      const [updateWindowOpen, setUpdateWindowOpen] = useState(false)
       const unitRef = useRef(null)
       const dragRef = useRef(null)
       const movedRef = useRef(false)
 
-      // 【10-18 20:45 作者同意 B:悬浮球拖到哪就记住哪】
+      // 【10-18 20:45 boss同意 B:悬浮球拖到哪就记住哪】
       // 原来只在内存里,重开桌面端就弹回右下角。
-      // 启动时从存档里读,顺手按当前窗口大小夹一下 —— 作者上次在 4K 上拖的位置,
+      // 启动时从存档里读,顺手按当前窗口大小夹一下 —— boss上次在 4K 上拖的位置,
       // 换到 1080p 的机器上打开,不能把球夹到屏幕外找不着。
       //
       // 【10-19 07:30】贴着底边存下来的旧位置一律作废 —— 那批值是
@@ -3760,7 +4653,7 @@ window.__ModuleLoader__.load({
         const vw = window.innerWidth || 0
         if (state.ballX === null || state.ballY === null) return
         const y = clamp(state.ballY, 0, Math.max(0, vh - 56))
-        // 底边 40px 以内算「贴着底」—— 旧默认位或者作者拖到底的位置,都不要
+        // 底边 40px 以内算「贴着底」—— 旧默认位或者boss拖到底的位置,都不要
         const stuckToBottom = y > vh - 56 - 40
         setOffset(stuckToBottom
           ? null
@@ -3768,6 +4661,27 @@ window.__ModuleLoader__.load({
               x: clamp(state.ballX, 0, Math.max(0, vw - 56)),
               y,
             })
+      }, [])
+
+      /**
+       * 【10-22 01:1x 全功能自检抓出来的真 bug】窗口变小之后球会跑出屏幕。
+       *
+       * 病根：上面那段只在**启动时**夹一次。boss在宽屏把球拖到右边 → 把窗口拖窄，
+       *       球的 `left` 还是按宽屏算的旧值 → 球看不见了（要拖窗口才能找回来）。
+       * 修法：窗口一变就按新尺寸重新夹。用纯函数 `clampBallXY` 做，能真跑验证。
+       */
+      useEffect(() => {
+        const onResize = () => {
+          const vw = window.innerWidth || 0
+          const vh = window.innerHeight || 0
+          setOffset((at) => {
+            if (!at) return at
+            const next = clampBallXY(at.x, at.y, vw, vh)
+            return next.x === at.x && next.y === at.y ? at : next
+          })
+        }
+        window.addEventListener('resize', onResize)
+        return () => window.removeEventListener('resize', onResize)
       }, [])
 
       useEffect(() => {
@@ -3810,7 +4724,7 @@ window.__ModuleLoader__.load({
 
       useEffect(() => {
         if (!open) return undefined
-        // 面板一开就把自定义音效拉过来,列出来给作者选
+        // 面板一开就把自定义音效拉过来,列出来给boss选
         void loadSoundList()
         const onDown = (event) => {
           const node = unitRef.current
@@ -3881,28 +4795,101 @@ window.__ModuleLoader__.load({
       }
 
       /**
-       * 【10-18 19:10 作者新要求:双击悬浮窗 = 自动换肤开关】
+       * 【10-18 19:10 boss新要求:双击悬浮窗 = 自动换肤开关】
        *
        * 浏览器单击总是先于双击触发,所以不能直接挂 onDoubleClick ——
        * 那样会先"开面板、再关面板、再开自动",手忙脚乱。
        * 这里的做法:单击先按住 260ms 不执行,如果 260ms 内来了第二下,
        * 就把这次单击作废、改走自动换肤。两下之间手速慢一点(超过 260ms)
-       * 就当两次普通单击 —— 那是作者自己慢慢点,不是双击。
+       * 就当两次普通单击 —— 那是boss自己慢慢点,不是双击。
+       *
+       * 【10-20 22:1x 加了三击:彩蛋贴纸】
+       * boss要「单击悬浮窗 3 次让它浮现,再单击 3 次让它关闭」。
+       * 于是单击/双击/三击得用**同一个计数器**分清楚,不能各挂各的:
+       *   第 1 下 → 挂 260ms 计时器,到点没等到下一下 = 单击(开面板)
+       *   第 2 下 → 作废第 1 下的计时器,重新挂 260ms;
+       *            这 260ms 内来了第 3 下 = 三击(贴纸);
+       *            没人来 = 双击(自动换肤)
+       *   第 3 下 → 作废计时器,走三击
+       *
+       * ⚠️ 代价(明说):双击比原来**晚 260ms** 才生效(原来是第二下立刻触发)。
+       *    这是「加第三档」必然带的代价 —— 不推迟就没法区分双击和三击。
+       *    boss要的就是三击,这个代价接受。
        */
       const clickTimer = useRef(null)
-      useEffect(() => () => { if (clickTimer.current) clearTimeout(clickTimer.current) }, [])
-
-      const onBallClick = () => {
-        if (clickTimer.current) {
-          clearTimeout(clickTimer.current)
-          clickTimer.current = null
+      const clickCount = useRef(0)
+      /**
+       * 【10-22 00:0x boss「双击右键」】自定义背景 ⇄ 系统默认壁纸。
+       *
+       * 跟左键那三档**完全分开计数**（右键只认"两下"），互不干扰；
+       * **单击右键什么都不做** —— boss要的是双击，单下不算数。
+       * 两下的判定窗口跟左键一样是 260ms（手速慢一点就是两次单击右键 = 不动作）。
+       */
+      const rightTimer = useRef(null)
+      const rightCount = useRef(0)
+      const onBallRightClick = (event) => {
+        event.preventDefault()
+        // 刚拖过就别当成点击
+        if (movedRef.current) {
           movedRef.current = false
-          void toggleAutoRotate().then((r) => r && say(r.text))
+          rightCount.current = 0
+          if (rightTimer.current) {
+            clearTimeout(rightTimer.current)
+            rightTimer.current = null
+          }
           return
         }
+        rightCount.current += 1
+        if (rightTimer.current) clearTimeout(rightTimer.current)
+        if (rightCount.current >= 2) {
+          rightCount.current = 0
+          rightTimer.current = null
+          void toggleWallpaperDefault().then((r) => r && say(r.text))
+          return
+        }
+        rightTimer.current = setTimeout(() => {
+          rightTimer.current = null
+          rightCount.current = 0
+        }, 260)
+      }
+      useEffect(() => () => {
+        if (clickTimer.current) clearTimeout(clickTimer.current)
+        if (rightTimer.current) clearTimeout(rightTimer.current)
+      }, [])
+
+      const onBallClick = () => {
+        // 刚拖过就别再当成点击,不然每次挪位置都会弹面板
+        if (movedRef.current) {
+          movedRef.current = false
+          clickCount.current = 0
+          if (clickTimer.current) {
+            clearTimeout(clickTimer.current)
+            clickTimer.current = null
+          }
+          return
+        }
+        clickCount.current += 1
+        const count = clickCount.current
+        if (count >= 3) {
+          // 第三下:三击 —— 彩蛋贴纸浮现/收起
+          if (clickTimer.current) {
+            clearTimeout(clickTimer.current)
+            clickTimer.current = null
+          }
+          clickCount.current = 0
+          setStickerOpen((was) => !was)
+          return
+        }
+        if (clickTimer.current) clearTimeout(clickTimer.current)
         clickTimer.current = setTimeout(() => {
           clickTimer.current = null
-          toggle()
+          clickCount.current = 0
+          if (count === 1) {
+            toggle()
+            return
+          }
+          // 第二下等到的:双击 = 自动换肤
+          void toggleAutoRotate().then((r) => r && say(r.text))
         }, 260)
       }
 
@@ -3925,7 +4912,7 @@ window.__ModuleLoader__.load({
       }
 
       /**
-       * 【10-19 07:30 作者】「换肤的悬浮图标不要默认放在右下角,把它往上抬一点,
+       * 【10-19 07:30 boss】「换肤的悬浮图标不要默认放在右下角,把它往上抬一点,
        * 否则我们在网页版输入的时候,它会挡着确认键,它的位置应该刚好大于网页版的输入框的位置。」
        *
        * 原来是 right:24 / bottom:24 —— 右下角贴死,正好压在输入框的发送键上。
@@ -3982,6 +4969,49 @@ window.__ModuleLoader__.load({
             zIndex: 2147483000,
           }
 
+      /**
+       * 【10-21 19:0x boss】贴纸摆哪儿 —— 改成「贴纸自己量自己、自己摆」。
+       *
+       * 这里**只做一件事**：量出球在视口里的位置，交给贴纸。
+       * 怎么摆、摆哪一边、会不会出界，全部由 placeSticker 算
+       *（纯函数，能抠出来真跑一遍验证）。
+       *
+       * 为什么不再在这里算坐标：
+       *   上一版在这里「估」贴纸的宽高（写死 300×300）再算坐标，
+       *   球在屏幕下沿时贴纸被顶到屏幕最上角 —— 离球十万八千里（boss 10-21 截图）。
+       */
+      const [ballRect, setBallRect] = useState(null)
+      useEffect(() => {
+        if (!stickerOpen) {
+          setBallRect(null)
+          return undefined
+        }
+        const measure = () => {
+          const node = unitRef.current
+          if (!node) return
+          const rect = node.getBoundingClientRect()
+          const next = {
+            left: rect.left,
+            right: rect.right,
+            top: rect.top,
+            bottom: rect.bottom,
+            width: rect.width,
+            height: rect.height,
+          }
+          // 坐标没变就别换新对象，免得贴纸白重摆一次
+          setBallRect((was) => {
+            if (was
+              && was.left === next.left && was.right === next.right
+              && was.top === next.top && was.bottom === next.bottom
+              && was.width === next.width && was.height === next.height) return was
+            return next
+          })
+        }
+        measure()
+        window.addEventListener('resize', measure)
+        return () => window.removeEventListener('resize', measure)
+      }, [stickerOpen, offset])
+
       return h(
         'div',
         {
@@ -4015,6 +5045,8 @@ window.__ModuleLoader__.load({
             'aria-expanded': open,
             onMouseDown: startDrag,
             onClick: onBallClick,
+            // 【10-22 00:0x boss】双击右键 = 自定义背景 ⇄ 系统默认壁纸
+            onContextMenu: onBallRightClick,
             style: {
               pointerEvents: 'auto',
               display: 'block',
@@ -4035,7 +5067,23 @@ window.__ModuleLoader__.load({
             style: { width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' },
           }),
         ),
-        // 【10-18 20:45 作者同意 C:自动换肤开着的时候,球上带个小绿点】
+        // 【10-20 22:1x 彩蛋】渠道限流贴纸。
+        // 【10-21 19:0x】位置改成贴纸自己算:给球的位置,它量自己、自己摆,
+        //   横着贴(离球 12px)放不下才改上下,永远夹在屏幕内。
+        h(ChannelLimitSticker, {
+          visible: stickerOpen,
+          onClose: () => setStickerOpen(false),
+          ballRect,
+        }),
+        /**
+         * 【10-22 08:2x boss】点「检查更新」弹出的新窗口。
+         *   它是**独立浮层**（不是浏览器新标签页）：底色跟着现在的换肤模式走，
+         *   关掉就回到悬浮窗。点外面/按 Esc 也能关。
+         */
+        updateWindowOpen
+          ? h(UpdateWindow, { onClose: () => setUpdateWindowOpen(false) })
+          : null,
+        // 【10-18 20:45 boss同意 C:自动换肤开着的时候,球上带个小绿点】
         // 不用双击去试 —— 一眼就知道现在是开着还是关着。
         state.rotateMinutes > 0
           ? h('div', {
@@ -4111,11 +5159,18 @@ window.__ModuleLoader__.load({
                   width: place.width,
                   maxHeight: place.maxHeight,
                   overflowY: 'auto',
-                  padding: 14,
-                  borderRadius: 14,
+                  /**
+                   * 【2026-10-22 16:4x boss要求界面美化】面板本身也收拾一下：
+                   *   内边距给足（14 → 16）、圆角大一点（14 → 16）、
+                   *   加一层轻投影，让它从背景图上"浮起来"而不是贴着一块白板。
+                   * ⚠️ 只改**长什么样**：位置、宽高、滚动行为一个没动。
+                   */
+                  padding: 16,
+                  borderRadius: 16,
                   border: `1px solid ${T.borderStrong}`,
                   background: T.surface,
                   color: T.primary,
+                  boxShadow: '0 12px 40px rgba(0, 0, 0, 0.18)',
                 },
               },
               h(
@@ -4126,14 +5181,20 @@ window.__ModuleLoader__.load({
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    marginBottom: 14,
-                    paddingBottom: 10,
+                    marginBottom: 16,
+                    paddingBottom: 12,
                     borderBottom: `1px solid ${T.border}`,
                     cursor: 'move',
                     userSelect: 'none',
                   },
                 },
-                h('span', { style: { fontSize: 14, fontWeight: 600 } }, dict.panelTitle),
+                // 【10-22 16:4x 美化】标题也加上那根小竖条，跟下面各段一致
+                h(
+                  'div',
+                  { style: { display: 'flex', alignItems: 'center', gap: 6 } },
+                  h('span', { style: PANEL_UI.titleMark, 'aria-hidden': 'true' }),
+                  h('span', { style: { fontSize: 14, fontWeight: 600 } }, dict.panelTitle),
+                ),
                 h(
                   'button',
                   {
@@ -4154,9 +5215,475 @@ window.__ModuleLoader__.load({
                   '×',
                 ),
               ),
-              h(SkinControls, { compact: true }),
+              h(SkinControls, { compact: true, onOpenUpdate: () => setUpdateWindowOpen(true) }),
             )
           : null,
+      )
+    }
+
+    /**
+     * 时间戳 → 人话（「3 小时前」「2 天前」）。
+     * 跟 Our Free Model 那边一个路子：**宁可说粗一点，也不要给一个假精确的日期**。
+     */
+    function formatWhen(ms) {
+      const now = Date.now()
+      const diff = Math.max(0, now - Number(ms || 0))
+      const minute = 60 * 1000
+      const hour = 60 * minute
+      const day = 24 * hour
+      if (diff < minute) return '刚刚'
+      if (diff < hour) return `${Math.floor(diff / minute)} 分钟前`
+      if (diff < day) return `${Math.floor(diff / hour)} 小时前`
+      if (diff < 30 * day) return `${Math.floor(diff / day)} 天前`
+      return `${Math.floor(diff / (30 * day))} 个月前`
+    }
+
+    /**
+     * ═══ 新窗口：更新 + 我的项目（一页两段）════════════════════
+     *
+     * 【10-22 08:2x boss】
+     *   「在换肤悬浮窗上，左边是默认界面，右边是『检查更新』。
+     *     点击『检查更新』之后，不要直接更新，而是弹出一个新的画面窗口。
+     *     新窗口的底色按照现在的悬浮窗模式来。
+     *     ……形式可以借助我们现有安装的这个插件 Our Free Model，
+     *     我们直接检查里面的两个：一个是插件升级，一个推荐项目，
+     *     推荐项目就写我们自己的项目，目前只有一个手机远程。」
+     *
+     * 布局决策（问过boss，选「一页两段」）：
+     *   不拆 tab —— 换肤面板只有 460px 宽，拆 tab 要多点一次，
+     *   而且「看自己的项目」比「查更新」常用得多。
+     *   但两段必须用分隔线 + 各自小标题分得清清楚楚，不能糊成一坨。
+     *
+     * 纪律（照抄 Our Free Model 那边的做法）：
+     *   **数字必须是真读回来的**，读不到就不显示那个数字，
+     *   绝不用占位数字凑版面 —— 这一页的说服力全在"数字是真的"。
+     */
+    function UpdateWindow({ onClose }) {
+      const dict = dictFor()
+      const [info, setInfo] = useState(null)
+      const [projects, setProjects] = useState(null)
+      const [busy, setBusy] = useState('')
+      const [downloaded, setDownloaded] = useState(null)
+      const [applied, setApplied] = useState(null)
+      const [failed, setFailed] = useState('')
+      const windowRef = useRef(null)
+
+      const check = async (force) => {
+        setBusy('check')
+        setFailed('')
+        try {
+          // 手动点「检查更新」时绕过缓存（缓存是 6 小时，手动点就该真的去问一次）
+          const data = force ? await getJson(`${UPDATE_CHECK_PATH}?fresh=1`) : await getJson(UPDATE_CHECK_PATH)
+          setInfo(data && typeof data === 'object' ? data : null)
+        } catch {
+          setInfo(null)
+        } finally {
+          setBusy('')
+        }
+      }
+
+      /**
+       * 【10-22 09:0x boss】「下载好放在旁边，由您点一下确认才替换」
+       *   ⇒ 下载这一步**只调 download 接口**，那个接口只写暂存目录，
+       *   **绝不碰现装的那一份**。下载完界面上出现「已下载好，点此安装」，
+       *   **那个按钮才是替换**（点了才调 apply，apply 内部先备份、失败自动回滚）。
+       */
+      const download = async () => {
+        setBusy('download')
+        setFailed('')
+        try {
+          const data = await postJson(UPDATE_DOWNLOAD_PATH, { method: 'download' })
+          if (data && data.ok === true) {
+            setDownloaded(data)
+          } else {
+            setFailed(String(data?.reason || 'download-failed'))
+            setDownloaded(null)
+          }
+        } catch {
+          setFailed('download-failed')
+        } finally {
+          setBusy('')
+        }
+      }
+
+      const apply = async () => {
+        setBusy('apply')
+        setFailed('')
+        try {
+          const data = await postJson(UPDATE_APPLY_PATH, { method: 'apply' })
+          if (data && data.ok === true) {
+            setApplied(data)
+            setDownloaded(null)
+          } else {
+            setFailed(String(data?.reason || 'apply-failed') + (data?.rolledBack ? '（已回滚）' : ''))
+          }
+        } catch {
+          setFailed('apply-failed')
+        } finally {
+          setBusy('')
+        }
+      }
+
+      useEffect(() => {
+        let alive = true
+        void loadUpdateInfo().then((data) => {
+          if (alive) setInfo(data)
+        })
+        void getJson(PROJECTS_PATH).then((data) => {
+          if (alive) setProjects(data && typeof data === 'object' ? data : null)
+        }).catch(() => {
+          if (alive) setProjects(null)
+        })
+        return () => {
+          alive = false
+        }
+      }, [])
+
+      /**
+       * 【10-22 08:2x boss】关闭方式三个：右上角「×」、按 Esc、点窗口外面。
+       * 放在**窗口组件自己**里 —— 外面那个 Launcher 拿不到这里的 DOM 节点，
+       * 跨组件传 ref 是本项目已经踩过的坑（面板就是靠"点到面板外面才关"）。
+       */
+      useEffect(() => {
+        const onKey = (event) => {
+          if (event.key === 'Escape') onClose()
+        }
+        const onDown = (event) => {
+          const node = windowRef.current
+          if (node && node.contains(event.target)) return
+          onClose()
+        }
+        document.addEventListener('keydown', onKey)
+        document.addEventListener('mousedown', onDown)
+        return () => {
+          document.removeEventListener('keydown', onKey)
+          document.removeEventListener('mousedown', onDown)
+        }
+      }, [onClose])
+
+      const outdated = info && info.ok === true && info.outdated === true
+      const items = Array.isArray(projects?.items) ? projects.items : []
+
+      return h(
+        'div',
+        {
+          className: 'dsh-skin-update-window',
+          ref: windowRef,
+          style: {
+            pointerEvents: 'auto',
+            position: 'fixed',
+            left: '50%',
+            top: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: 'min(460px, calc(100vw - 24px))',
+            maxHeight: 'min(70vh, 560px)',
+            overflowY: 'auto',
+            padding: 16,
+            borderRadius: 14,
+            border: `1px solid ${T.borderStrong}`,
+            /**
+             * 【10-22 19:1x boss】「检查更新跳出来的页面透明度太低了……因为透明度太低，
+             * 导致前面显示的文字看不清楚了」
+             *
+             * 根因（查实的）：这个窗口原来直接用 `T.surface`（= `--dsw-alias-bg-overlay`），
+             * 而那枚 token 的不透明度被**乘了 0.6**（`normalizePopupAlpha(state.popupAlpha) * 0.6`）——
+             * 那是 10-18 为**下拉菜单**调的浓度（当时boss说「毛玻璃透明度别那么低」）。
+             * 默认 popupAlpha=0.95 → 实际只有 **0.57**，壁纸和聊天区的字直接透上来。
+             *
+             * 修法（**只动这个窗口，不碰全局 token**）：
+             *   底色换成**近乎不透明**的实色（0.97）——把后面的字彻底压住；
+             *   再加毛玻璃模糊，边缘看着还是通透的，不像贴了块白纸。
+             * ⚠️ 为什么不改 `--dsw-alias-bg-overlay` 本身：那一枚是全局的，
+             *    改了会把下拉菜单、弹窗、输入框一起变浓 —— 超出boss这次说的范围。
+             *
+             * ⚠️⚠️ **别用多层 background 写这个**（本轮实测踩到）：
+             *   ① 层序反了 —— CSS 多层 background 是「第一层在最上面」，
+             *      把半透那层写在前面、实底写在后面，等于**没加**；
+             *   ② 更坑的是**浏览器可能整条解析失败** ——
+             *      `background: rgba(...), rgba(...)` 这种多层简写在 Chromium 里
+             *      如果层类型/数量不匹配会**整条作废**，结果连半透那层都没了 →
+             *      实测中心像素还是底下的深色（65,70,78），**看起来跟没改一样**。
+             *   ⇒ **老老实实用单层实色 + backdrop-filter**，别玩多层。
+             */
+            background: 'rgba(255, 255, 255, 0.97)',
+            backdropFilter: 'blur(24px) saturate(1.6)',
+            WebkitBackdropFilter: 'blur(24px) saturate(1.6)',
+            color: T.primary,
+            boxShadow: '0 18px 60px rgba(0, 0, 0, 0.42)',
+            zIndex: 2147483002,
+          },
+        },
+        // 标题栏
+        h(
+          'div',
+          {
+            style: {
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: 14,
+              paddingBottom: 10,
+              borderBottom: `1px solid ${T.border}`,
+              userSelect: 'none',
+            },
+          },
+          h('span', { style: { fontSize: 14, fontWeight: 600 } }, dict.updateWindowTitle),
+          h(
+            'button',
+            {
+              type: 'button',
+              title: dict.close,
+              'aria-label': dict.close,
+              onClick: onClose,
+              style: {
+                border: 'none',
+                background: 'transparent',
+                color: T.secondary,
+                fontSize: 18,
+                lineHeight: 1,
+                cursor: 'pointer',
+                padding: '0 4px',
+              },
+            },
+            '×',
+          ),
+        ),
+        // ── 第一段：更新 ──
+        h(
+          'section',
+          null,
+          h('div', { style: { fontSize: 12, fontWeight: 600, marginBottom: 8 } }, dict.updateSection),
+          h(
+            'div',
+            {
+              style: {
+                fontSize: 11,
+                color: T.secondary,
+                lineHeight: 1.7,
+                marginBottom: 8,
+              },
+            },
+            dict.updateSectionHint,
+          ),
+          h(
+            'div',
+            { style: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 10 } },
+            h(
+              'span',
+              { style: { fontSize: 11, color: T.secondary } },
+              `${dict.updateCurrent}: ${info && info.current ? `v${info.current}` : '—'}`,
+            ),
+            info && info.latest
+              ? h(
+                  'span',
+                  { style: { fontSize: 11, color: T.secondary } },
+                  `${dict.updateLatest}: v${info.latest}`,
+                )
+              : null,
+            outdated
+              ? h(
+                  'span',
+                  {
+                    style: {
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: T.danger,
+                      border: `1px solid ${T.danger}`,
+                      borderRadius: 999,
+                      padding: '1px 8px',
+                    },
+                  },
+                  dict.updateOutdated,
+                )
+              : null,
+            info && info.ok === true && !outdated
+              ? h(
+                  'span',
+                  { style: { fontSize: 11, color: T.secondary } },
+                  dict.updateUpToDate,
+                )
+              : null,
+          ),
+          h(
+            'div',
+            { style: { display: 'flex', gap: 8, flexWrap: 'wrap' } },
+            h(
+              'button',
+              {
+                type: 'button',
+                onClick: () => void check(true),
+                disabled: Boolean(busy),
+                style: { ...buttonStyle(false), opacity: busy ? 0.6 : 1 },
+              },
+              busy === 'check' ? dict.updateChecking : dict.updateCheck,
+            ),
+            /**
+             * 【10-22 09:0x boss】「下载好放在旁边，由您点一下确认才替换」
+             *   第二步「下载更新」：**只下载**，现装的那份一个字节都不动。
+             *   按钮文案明说"下载"，别让人以为点了就换了。
+             */
+            outdated
+              ? h(
+                  'button',
+                  {
+                    type: 'button',
+                    onClick: () => void download(),
+                    disabled: Boolean(busy),
+                    style: { ...buttonStyle(false), opacity: busy ? 0.6 : 1 },
+                  },
+                  busy === 'download' ? dict.updateDownloading : dict.updateDownload,
+                )
+              : null,
+            // ⚠️ 点「去仓库页」只是打开网页 —— 不想用自动更新的人还有这条路
+            info && info.pageUrl
+              ? h(
+                  'button',
+                  {
+                    type: 'button',
+                    onClick: () => window.open(String(info.pageUrl), '_blank'),
+                    style: buttonStyle(false),
+                  },
+                  dict.updateGoRepo,
+                )
+              : null,
+          ),
+          /**
+           * 第三步：下载好了，**等用户点一下才替换**。
+           * 这一段是boss那句「由您点一下确认才替换」的落点 —— 按钮摆在这儿，
+           * 文案明说"点这个才替换"，并且告诉用户替换后要重启。
+           */
+          downloaded
+            ? h(
+                'div',
+                {
+                  style: {
+                    marginTop: 10,
+                    padding: 10,
+                    border: `1px solid ${T.borderStrong}`,
+                    borderRadius: 10,
+                  },
+                },
+                h(
+                  'div',
+                  { style: { fontSize: 11, color: T.secondary, lineHeight: 1.7, marginBottom: 8 } },
+                  dict.updateDownloadedHint.replace('{n}', String(downloaded.files || 0)),
+                ),
+                h(
+                  'button',
+                  {
+                    type: 'button',
+                    onClick: () => void apply(),
+                    disabled: Boolean(busy),
+                    style: { ...buttonStyle(false), opacity: busy ? 0.6 : 1 },
+                  },
+                  busy === 'apply' ? dict.updateInstalling : dict.updateInstall,
+                ),
+              )
+            : null,
+          applied
+            ? h(
+                'div',
+                {
+                  style: {
+                    marginTop: 10,
+                    padding: 10,
+                    border: `1px solid ${T.danger}`,
+                    borderRadius: 10,
+                    fontSize: 11,
+                    lineHeight: 1.7,
+                    color: T.danger,
+                  },
+                },
+                dict.updateAppliedHint,
+              )
+            : null,
+          failed
+            ? h(
+                'div',
+                {
+                  style: {
+                    marginTop: 8,
+                    fontSize: 11,
+                    lineHeight: 1.7,
+                    color: T.danger,
+                  },
+                },
+                `${dict.updateFailed}: ${failed}`,
+              )
+            : null,
+        ),
+        // ── 第二段：我的项目 ──
+        h(
+          'section',
+          {
+            style: {
+              marginTop: 16,
+              paddingTop: 14,
+              borderTop: `1px solid ${T.border}`,
+            },
+          },
+          h('div', { style: { fontSize: 12, fontWeight: 600, marginBottom: 6 } }, dict.projectsSection),
+          h(
+            'div',
+            { style: { fontSize: 11, color: T.secondary, lineHeight: 1.7, marginBottom: 10 } },
+            dict.projectsSectionHint,
+          ),
+          items.length === 0
+            ? h('div', { style: { fontSize: 11, color: T.secondary } }, dict.projectsEmpty)
+            : items.map((item) =>
+                h(
+                  'div',
+                  {
+                    key: item.id,
+                    style: {
+                      border: `1px solid ${T.border}`,
+                      borderRadius: 10,
+                      padding: 10,
+                      marginBottom: 8,
+                    },
+                  },
+                  h(
+                    'div',
+                    { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 4 } },
+                    h(
+                      'span',
+                      { style: { fontSize: 12, fontWeight: 700 } },
+                      item.name,
+                    ),
+                    h(
+                      'button',
+                      {
+                        type: 'button',
+                        onClick: () => window.open(String(item.url || ''), '_blank'),
+                        style: {
+                          border: `1px solid ${T.borderStrong}`,
+                          background: 'transparent',
+                          color: T.primary,
+                          fontSize: 11,
+                          borderRadius: 8,
+                          padding: '4px 10px',
+                          cursor: 'pointer',
+                        },
+                      },
+                      dict.projectsOpen,
+                    ),
+                  ),
+                  h(
+                    'div',
+                    { style: { fontSize: 10, color: T.secondary, marginBottom: 6, wordBreak: 'break-all' } },
+                    item.repo,
+                  ),
+                  // 数字只在真读到时才出现
+                  h(
+                    'div',
+                    { style: { display: 'flex', gap: 12, fontSize: 11, color: T.secondary } },
+                    typeof item.stars === 'number' ? h('span', null, `★ ${item.stars}`) : null,
+                    typeof item.forks === 'number' ? h('span', null, `Fork ${item.forks}`) : null,
+                    item.pushedAt ? h('span', null, `${dict.projectsUpdated} ${formatWhen(item.pushedAt)}`) : null,
+                  ),
+                ),
+              ),
+        ),
       )
     }
 
@@ -4197,10 +5724,10 @@ window.__ModuleLoader__.load({
       )
     }
 
-    // 页内自检已彻底移除(作者 10-18 18:00 拍板)。
+    // 页内自检已彻底移除(boss 10-18 18:00 拍板)。
     // 原来每次启动 4 秒后,它会真的连切几张背景图来验证换图功能 ——
-    // 作者开机就看到背景"唰唰"换一批。以后验证一律走离线脚本
-    // (dsh-skin/verify/ 目录,在 Node 里模拟渲染,不碰作者的界面)。
+    // boss开机就看到背景"唰唰"换一批。以后验证一律走离线脚本
+    // (dsh-skin/verify/ 目录,在 Node 里模拟渲染,不碰boss的界面)。
 
 
     // ── 装配 ──────────────────────────────────────────────

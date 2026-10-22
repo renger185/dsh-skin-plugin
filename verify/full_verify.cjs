@@ -1,7 +1,7 @@
 /**
  * 换肤插件 · 完整验证
  *
- * 目的:用作者的真实数据(1387 张图的图库 + 真实设置),
+ * 目的:用boss的真实数据(1387 张图的图库 + 真实设置),
  *      走一遍客户端真实会走的路径:加载 → 装配 → 异步初始化 → 生成主题 token。
  *      任何一步抛错,都会让桌面版起不来,所以每一步都必须过。
  *
@@ -95,7 +95,7 @@ global.requestAnimationFrame = (f) => setTimeout(f, 16)
 global.cancelAnimationFrame = clearTimeout
 global.matchMedia = global.window.matchMedia
 
-// ── 主机接口桩(返回作者的真实数据)──
+// ── 主机接口桩(返回boss的真实数据)──
 let apiCalls = 0
 global.fetch = (url) => {
   const u = String(url)
@@ -203,9 +203,9 @@ setTimeout(() => {
     const t = captured['--dsw-alias-label-tertiary']
     console.log('   三级文字色(图标/进行中) ' + (t ? JSON.stringify(t) : '(未触发保底:对比度够)'))
     /**
-     * 【10-19 08:51 加这一段】作者三次报「系统图标看不见」,每次都得手算才知道
+     * 【10-19 08:51 加这一段】boss三次报「系统图标看不见」,每次都得手算才知道
      * 图标色到底是多少。直接打出来 + 算对比度 —— 白图标压白底这种错,
-     * 以后在这一步就会被拦下,不会再等到作者重启才发现。
+     * 以后在这一步就会被拦下,不会再等到boss重启才发现。
      */
     const icon = captured['--dsw-alias-menu-icon']
     const iconV = icon ? String(icon.light || '') : ''
@@ -237,9 +237,9 @@ setTimeout(() => {
     }
 
     /**
-     * ═══ 【10-19 09:5x 新加】作者报的「白底 + 看不见」两类，全部转成硬判据 ═══
+     * ═══ 【10-19 09:5x 新加】boss报的「白底 + 看不见」两类，全部转成硬判据 ═══
      *
-     * 作者原话:「系统标识有白色底的，里面文字看不到。对话内容中有白色底色的
+     * boss原话:「系统标识有白色底的，里面文字看不到。对话内容中有白色底色的
      * 有的看的到，有的看不到。」根因是这批**不透明实色底**一枚都没洗过。
      * 判据不手抄：两套值直接从 client.js 的 SOLID_FILLS 表里抠；
      * 「该用哪一档」按当前这张图自己算（跟 inkToneFor 同一套切块口径）。
@@ -265,7 +265,7 @@ setTimeout(() => {
     if (wrong.length) problems.push(`实色底写错档:${wrong.length} 枚（例：${wrong[0]}）`)
 
     /**
-     * 【10-19 13:2x】作者红框那张**交付文件卡片**走的是「组件局部变量 ← 静态色板」那条路，
+     * 【10-19 13:2x】boss红框那张**交付文件卡片**走的是「组件局部变量 ← 静态色板」那条路，
      * 这四枚也必须跟着字色档翻，否则深色壁纸下卡片还是白的、字是白的。
      */
     const flips = [...src.matchAll(/\{ name: '(--dsw-static-neutral-[0-9]+)', onLight: '(#[0-9a-f]{6})', onDark: '(#[0-9a-f]{6})' \}/g)]
@@ -300,7 +300,7 @@ setTimeout(() => {
   console.log('')
   /**
    * 【23:20 补一条硬判据,防「静默失败」】
-   * 23:08 作者报「选了图片直接没反应」,根因是 buildTokens 里有个
+   * 23:08 boss报「选了图片直接没反应」,根因是 buildTokens 里有个
    * ReferenceError 被外层 try/catch 吞了 —— token 一次都没写进去,
    * 而这份报告当时还写着「全部无异常」,把我骗过去了。
    * 现在:只要有底图却一次 token 都没写,直接判失败,不许报绿。

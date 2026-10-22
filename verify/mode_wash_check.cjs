@@ -1,7 +1,7 @@
 /**
- * 三个模式的「遮罩档」到底还生不生效？（10-19 18:5x 作者打回后补的）
+ * 三个模式的「遮罩档」到底还生不生效？（10-19 18:5x boss打回后补的）
  *
- * 作者原话:「你把图片背景的明度、透明度给删掉了…要不然我们『休闲』『专注』
+ * boss原话:「你把图片背景的明度、透明度给删掉了…要不然我们『休闲』『专注』
  * 和『正常』这三个模式都用不了了。」
  *
  * 这个脚本把 client.js 里的 effectiveWash **原样抠出来真跑**（不是查关键字），
@@ -65,7 +65,7 @@ ok('手调 10 就是 10', run('normal', 10, 0, 12) === 10)
 ok('手调值超过滑杆上限会被夹住', run('normal', 999, 0, 12) === MAX_WASH, `夹到 ${MAX_WASH}%`)
 
 console.log('')
-console.log('「自动底线」只当建议，不再改数值（作者 10-19 20:2x：「为什么是从 9 开始的」）：')
+console.log('「自动底线」只当建议，不再改数值（boss 10-19 20:2x：「为什么是从 9 开始的」）：')
 ok('底线 9 时，休闲仍是 5（不被抬到 9）', run('leisure', null, 9, 12) === LEISURE_MASK, `5 → ${run('leisure', null, 9, 12)}`)
 ok('底线 9 时，正常手调 0 仍是 0（图原样透出来）', run('normal', 0, 9, 12) === 0)
 ok('底线 9 时，专注仍是 35', run('focus', null, 9, 12) === FOCUS_MASK)
@@ -84,7 +84,7 @@ ok(
 console.log('')
 console.log('面板上那根滑杆：')
 ok('滑杆左端就是 0（不是这张图的底线）', /min: 0,\s*\n\s*max: MAX_WASH,/.test(SRC) && !/min: floorPct,/.test(SRC))
-ok('滑杆上限=MAX_WASH（作者要的 0~40）', /max: MAX_WASH,/.test(SRC) && MAX_WASH === 40)
+ok('滑杆上限=MAX_WASH（boss要的 0~40）', /max: MAX_WASH,/.test(SRC) && MAX_WASH === 40)
 ok('专注/休闲时滑杆锁上（disabled）', /disabled: locked,/.test(SRC))
 
 console.log('')

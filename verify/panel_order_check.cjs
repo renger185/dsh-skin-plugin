@@ -37,7 +37,13 @@ ok('语言开关不进 DICTS（不然切换时自己会被翻掉）', !/langLabe
 ok('默认中文', /lang: 'zh'/.test(SRC) && /src\.lang === 'en' \? 'en' : 'zh'/.test(SRC))
 ok('一键切换（setLang 立刻重画 + 落盘）', /async function setLang\(next\)/.test(SRC) && /await saveState\(\{ lang \}\)/.test(SRC))
 ok('dictFor 认面板选的语言', /const chosen = state\.lang === 'en' \? 'en' : 'zh'/.test(SRC))
-ok('恢复默认不会把语言重置（语言不算界面配色）', /soundId: state\.soundId, lang: state\.lang \}/.test(SRC))
+/**
+ * ⚠️ 2026-10-22：这条原来写成 `soundId: state.soundId, lang: state.lang }`，
+ *    把「lang 是 state 字面量的最后一个字段」也当成了判据 ——
+ *    后面只要再追加任何一个字段（本轮加了 lastWallId）就会误报。
+ *    判据该管的只是「语言被保留下来」，不该管字段排第几。
+ */
+ok('恢复默认不会把语言重置（语言不算界面配色）', /lang: state\.lang[,\s}]/.test(SRC))
 ok('主机端也归一化 lang（只认 zh/en）', /next\.lang = next\.lang === 'en' \? 'en' : 'zh'/.test(HOST))
 
 /**

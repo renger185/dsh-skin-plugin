@@ -90,7 +90,7 @@ for (const e of LIB) {
   if (wash === 0) zero++
   if (wash >= AUTO_FLOOR_CAP) cap++
   /**
-   * 【10-19 16:2x 口径改了】蓝字档整个撤掉（作者报「文字通篇蓝色」）。
+   * 【10-19 16:2x 口径改了】蓝字档整个撤掉（boss报「文字通篇蓝色」）。
    * 以前这里还替蓝字判一遍（壁纸亮 + wash>8%），现在字色只有 inkToneFor 一条路：
    * 黑块多 → 白字；亮块多 → 黑字。所以 blue 永远是 0 —— 留着这个计数是为了
    * 让报告明确写出「蓝字 0 张」，而不是让人再去猜。
@@ -101,9 +101,9 @@ for (const e of LIB) {
 const n = LIB.length
 const pct = (v) => ((v / n) * 100).toFixed(1) + '%'
 console.log('全库 ' + n + ' 张（口径：effectiveWash = 自动底线 0~' + AUTO_FLOOR_CAP + '%）')
-console.log('  白字 ' + String(white).padStart(5) + '  ' + pct(white) + '   ← 壁纸偏暗那批（作者报的「白底白字」就发生在这一档）')
+console.log('  白字 ' + String(white).padStart(5) + '  ' + pct(white) + '   ← 壁纸偏暗那批（boss报的「白底白字」就发生在这一档）')
 console.log('  黑字 ' + String(black).padStart(5) + '  ' + pct(black))
-console.log('  蓝字 ' + String(blue).padStart(5) + '  ' + pct(blue) + '   ← 10-19 16:2x 起这一档撤掉，永远是 0（作者：「文字通篇蓝色」是 bug）')
+console.log('  蓝字 ' + String(blue).padStart(5) + '  ' + pct(blue) + '   ← 10-19 16:2x 起这一档撤掉，永远是 0（boss：「文字通篇蓝色」是 bug）')
 console.log('')
 console.log('垫底（wash）分布：0% 的 ' + zero + ' 张（' + pct(zero) + '），垫到封顶 ' + AUTO_FLOOR_CAP + '% 的 ' + cap + ' 张（' + pct(cap) + '）')
 const top = [...washHist.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8)

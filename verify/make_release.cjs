@@ -4,7 +4,7 @@
  * 把当前 plugin/ 里「真正会装进桌面端的那几个文件」拷进
  *   releases/v<版本号>_<日期>/plugin/
  * 并写一份 `文件清单.md`（含每个文件的 SHA256）—— 以后想确认
- * 「作者桌面上跑的是哪一版」或者想回滚，拿这份清单对哈希就行。
+ * 「boss桌面上跑的是哪一版」或者想回滚，拿这份清单对哈希就行。
  *
  * 版本号的事实源只有一个：`plugin/package.json` 的 version 字段。
  *
@@ -73,7 +73,7 @@ lines.push('')
 lines.push(`打包时间：${human}`)
 lines.push(`打包目录：\`releases/v${version}_${stamp}/\``)
 lines.push('')
-lines.push('这份清单里每个文件的哈希都对得上，就说明「作者桌面上装的那一版」就是这一版。')
+lines.push('这份清单里每个文件的哈希都对得上，就说明「boss桌面上装的那一版」就是这一版。')
 lines.push('')
 lines.push('| 文件 | 字节 | SHA256 |')
 lines.push('|---|---|---|')

@@ -14,10 +14,10 @@ const ok = (label, cond, detail) => {
   console.log(`${cond ? 'OK  ' : 'FAIL'} ${label}${detail ? '  ' + detail : ''}`)
 }
 
-console.log('══ ① 默认只有黑/白,蓝字是例外(作者 10-19 00:56 打回)══')
+console.log('══ ① 默认只有黑/白,蓝字是例外(boss 10-19 00:56 打回)══')
 ok('蓝字调色板还留着(不删,以后要窄判据再接回来)', /const BLUE_INK = \{[\s\S]{0,200}primary: '#0b57d0'/.test(CLIENT))
 /**
- * 【10-19 16:2x 口径变了】作者报「文字通篇蓝色」→ 蓝字档整个撤掉。
+ * 【10-19 16:2x 口径变了】boss报「文字通篇蓝色」→ 蓝字档整个撤掉。
  * 现在字色只有黑/白两档，判据只有一个源头：inkToneFor（壁纸明暗）。
  * 旧的两条判据（imageBright / wash>0.08）必须**不在**了 —— 它们正是
  * 「自动底线把 wash 抬起来之后，18 张亮图重新变蓝」的那条漏网路。
@@ -25,19 +25,19 @@ ok('蓝字调色板还留着(不删,以后要窄判据再接回来)', /const BLU
 ok('字色只按壁纸明暗出黑白两档(inkToneFor 是唯一源头)', /const band = inkToneFor\(entry, scheme\)/.test(CLIENT))
 ok('旧蓝字判据已彻底拿掉(壁纸亮 + wash>0.08 这条漏网路)', !/imageBright && brightVeil/.test(CLIENT) && !/brightVeil = veilLum/.test(CLIENT))
 ok('蓝字不再被自动选用(ink 只可能是 LIGHT_INK / DARK_INK)', /const ink = band === 'white' \? LIGHT_INK : DARK_INK/.test(CLIENT))
-ok('注释里记着作者两次打回的原话', /我们默认的字体只有黑跟白两种[，,]这就不对了[，,]这是一个 bug/.test(CLIENT) && /文字通篇蓝色/.test(CLIENT))
+ok('注释里记着boss两次打回的原话', /我们默认的字体只有黑跟白两种[，,]这就不对了[，,]这是一个 bug/.test(CLIENT) && /文字通篇蓝色/.test(CLIENT))
 
 console.log('')
-console.log('══ ② 背景明度滑杆回来了,三个模式才不是摆设(作者 10-19 18:5x 打回) ══')
+console.log('══ ② 背景明度滑杆回来了,三个模式才不是摆设(boss 10-19 18:5x 打回) ══')
 /**
- * 【口径第三次变】00:56 作者说「不要遮罩」→ 我当时把整栏删了、wash 写死 0；
+ * 【口径第三次变】00:56 boss说「不要遮罩」→ 我当时把整栏删了、wash 写死 0；
  * 18:5x 他打回:「你把图片背景的明度、透明度给删掉了…要不然我们『休闲』『专注』
  * 和『正常』这三个模式都用不了了」。现在滑杆回来了，模式的值也重新生效。
  * 这两条是**成对**的：控件删了、语义跟着废，模式就成了摆设 —— 判据要把两半都盯住。
  */
 ok('明度滑杆回来了(type=range + setWash)', /type: 'range'[\s\S]{0,600}setWash\(clamp\(Number\(event\.target\.value\), 0, MAX_WASH\), false\)/.test(CLIENT))
 /**
- * 【口径第四次变，10-19 20:2x 作者：「为什么是从 9 开始的」】
+ * 【口径第四次变，10-19 20:2x boss：「为什么是从 9 开始的」】
  * 滑杆左端原来顶着「自动底线」（那张图算出来是 9），写着 0~40 却拖不到 0。
  * 现在左端就是 0；底线只当一行建议，不再改数值、不挡手。
  */
@@ -71,7 +71,7 @@ ok('读体闸换成新上限', /if \(size > MAX_BODY_BYTES\)/.test(HOST))
 ok('decodeDataUrl 支持按类型传上限', /function decodeDataUrl\(value, maxBytes = MAX_IMAGE_BYTES\)/.test(HOST))
 /**
  * 【10-19 14:0x 口径变了】以前是「先按 8MB 解、超了就报 bad sound」——
- * 作者只能看到一句「bad sound」。现在先按读体上限解出来，再单独判 8MB，
+ * boss只能看到一句「bad sound」。现在先按读体上限解出来，再单独判 8MB，
  * 报的才是「单个音效最多 8MB」这句人话。
  */
 ok('音频按 8MB 判(不是 24MB)，且超限报的是人话',
@@ -83,7 +83,7 @@ ok('格式不对、文件太大各有各的提示', /这个格式用不了/.test
 ok('提示显示在面板上', /soundNote\s*\n?\s*\? h\('div'/.test(CLIENT))
 
 console.log('')
-console.log('══ ③ 自定义音效(作者 00:20 要的「添加窗口」)══')
+console.log('══ ③ 自定义音效(boss 00:20 要的「添加窗口」)══')
 ok('主机端开了 sounds 接口', /const SOUNDS_PATH = '\/dsh-skin\/sounds'/.test(HOST))
 ok('主机端开了音频本体接口', /const SOUND_FILE_PATH = '\/dsh-skin\/sound'/.test(HOST))
 ok('两条路由都注册了', /path: SOUNDS_PATH, handler: handleSounds/.test(HOST) && /path: SOUND_FILE_PATH, handler: handleSoundFile/.test(HOST))
@@ -113,19 +113,39 @@ ok('删除按钮有中文提示词', /soundRemove: '删掉这个音效'/.test(CL
 ok('英文提示词也齐全', /soundRemove: 'Delete this sound'/.test(CLIENT))
 
 console.log('')
-console.log('══ ③b 提示音「提前响」的三道防线(作者 10-19 20:4x) ══')
+console.log('══ ③b 提示音「提前响」的三道防线(boss 10-19 20:4x) ══')
 /**
- * 作者原话：「有的时候任务还没跑完，但是它就已经声音提醒你了，基本上过一两分钟才结束。」
+ * boss原话：「有的时候任务还没跑完，但是它就已经声音提醒你了，基本上过一两分钟才结束。」
  * 两个原因：① 维护阶段（压缩上下文）也被应用报成 idle；
  *          ② 广播是所有 agent 的，子 agent 先干完也报 idle。
  * 判据都对着主机端源码，细则见 index.js 那段注释。
+ *
+ * 【10-20 23:5x 判据改了两次，说明写在这里，别再改回去】
+ * ①「维护阶段的假空闲被排除」：**20:1x 实测这条保护是空转的** ——
+ *    主机端收到的 `agent/status` 广播**只带 status，不带 phase.kind**
+ *    （桌面端程序里 `emit("agent/status", { status })` 就一个字段），
+ *    所以那道 if **从来没有拦住过任何东西**。**空转的判断不是防护，是假绿**
+ *    → 20:1x 把它删了，改由「按支记账」真正防住提前响。
+ *
+ * ⚠️ 判据写法上的坑：主机端**注释里还留着** `phase?.kind === 'maintenance'`
+ *    这段字样（讲的是「当年打算怎么做」），所以判据不能直接对全文搜 ——
+ *    **只搜代码行**（把注释行剔掉再匹配），否则会误判成「保护还在」。
+ * ②「按 agent 记账」→ 23:5x 升级成**按支（根会话）记账**：子 agent 归到
+ *    它的主会话底下，子 agent 干完不算，主会话干完才响。
+ *    变量名从 runningAgents 改成 runningByRoot（Map：根会话 → 它的 agent 集合）。
+ * ③「还有人跑着就不响」→ 收窄成「**这一支**还有人在跑就不响」：
+ *    旧版是「**所有**会话都得空」，多会话并行时永远不成立（真机留痕实证：
+ *    N 序列 5→5→5→5→4→4→3→5，**从没到过 0**）—— 这才是「有时有声音
+ *    有时没声音」的真正主因。
  */
-ok('维护阶段的假空闲被排除', /phase\?\.kind === 'maintenance'/.test(HOST))
-ok('按 agent 记账（子 agent 先完不响）', /runningAgents\.add\(who\)/.test(HOST) && /runningAgents\.delete\(who\)/.test(HOST))
-ok('还有人跑着就不响', /if \(runningAgents\.size > 0\) return/.test(HOST))
+const HOST_CODE = HOST.split('\n').filter((l) => !/^\s*(\*|\/\/|\/\*)/.test(l)).join('\n')
+ok('维护阶段的假空闲那道保护已删（实测空转，留着是假绿）', !/phase\?\.kind === 'maintenance'/.test(HOST_CODE))
+ok('★ 按支记账（子 agent 归到主会话，主会话干完才响）', /runningByRoot\.get\(root\)\.add\(who\)/.test(HOST) && /set\.delete\(who\)/.test(HOST) && /isChildAgent/.test(HOST))
+ok('★ 这一支有人跑着就不响（不再等所有会话都空）', /if \(rootRunning\(root\) > 0\) return/.test(HOST))
 ok('静一静再响（短促抖动取消）', /BELL_SETTLE_MS/.test(HOST) && /cancelSettle\(\)/.test(HOST))
 ok('静一静的默认值 3 秒（可被 config 覆盖，测试用）', /: 3000$/.test(HOST.split('\n').find((l) => l.includes('BELL_SETTLE_MS =')) || ''))
 ok('卸载时把定时器清掉', /cancelSettle\(\) \/\/ 卸载时别把定时器留在那儿/.test(HOST))
+ok('★ 留痕：bell 接口回 trace（23:5x 用来定位「为什么没响」）', /trace: bellTrace/.test(HOST))
 
 console.log('')
 console.log('══ ④ 毛玻璃还在(遮罩删了但毛玻璃不删) ══')
@@ -135,7 +155,7 @@ ok('surfaces 用「垫底色混壁纸」的真实颜色',
   /blendedSurface\(scheme, layer\.name, alpha, toneRgb, wantsWhite\)/.test(CLIENT))
 
 console.log('')
-console.log('══ ⑥ 系统图标色(作者 07:15 / 08:03 / 08:45 三次报)══')
+console.log('══ ⑥ 系统图标色(boss 07:15 / 08:03 / 08:45 三次报)══')
 ok('图标色不再跟文字三级色走', !/tokens\['--dsw-alias-menu-icon'\] = both\(fixIfBlind\(ink\.tertiary/.test(CLIENT))
 // 08:45 的定稿:从**真正写进去的菜单底色**反推,不再自己另算一遍背景
 // 10-19 09:5x 再收一刀:菜单材质那层真正用的是 --dsw-menu-surface-fill
@@ -147,14 +167,14 @@ ok('菜单材质那枚底(--dsw-menu-surface-fill)也洗了',
 ok('判据用 parseColorWithAlpha 读回真实值', /const menuRgb = parseColorWithAlpha\(menuToken\)/.test(CLIENT))
 ok('底亮→黑图标,底暗→白图标', /menuLum > 0\.45 \? '#1a1c20' : '#ffffff'/.test(CLIENT))
 ok('图标色不再走 fixIfBlind(推色会拿壁纸当基准,推反方向)', !/menu-icon'\] = both\(fixIfBlind/.test(CLIENT))
-// 08:03 那次「侧栏压暗」实际刷成了 82% 的白,是作者说的白色充填底衬 —— 必须撤掉
-ok('侧栏 82% 白垫已撤掉(那正是作者说的白色充填底衬)', !/sidebarVeil/.test(CLIENT))
+// 08:03 那次「侧栏压暗」实际刷成了 82% 的白,是boss说的白色充填底衬 —— 必须撤掉
+ok('侧栏 82% 白垫已撤掉(那正是boss说的白色充填底衬)', !/sidebarVeil/.test(CLIENT))
 ok('图标色只有一处来源(以前两处,后者覆盖前者,改漏就白改)',
   (CLIENT.match(/tokens\['--dsw-alias-menu-icon'\] = /g) || []).length === 1)
-ok('注释里记着作者原话', /图标里面应该显示黑色,但是现在看不到了/.test(CLIENT))
+ok('注释里记着boss原话', /图标里面应该显示黑色,但是现在看不到了/.test(CLIENT))
 
 console.log('')
-console.log('══ ⑧ 悬浮球默认位抬到输入框上沿(作者 10-19 07:30)══')
+console.log('══ ⑧ 悬浮球默认位抬到输入框上沿(boss 10-19 07:30)══')
 ok('默认位不再贴右下角(right:24/bottom:24 已删)', !/position: 'fixed', right: 24, bottom: 24/.test(CLIENT))
 ok('默认位改成算出来的 restY', /top: restY === null \? Math\.max\(80, \(window\.innerHeight \|\| 700\) - 176\) : restY/.test(CLIENT))
 ok('会自己去找输入框', /querySelectorAll\('textarea, \[contenteditable="true"\], input\[type="text"\]'\)/.test(CLIENT))
@@ -165,7 +185,7 @@ ok('窗口尺寸变了会重算', /window\.addEventListener\('resize', find\)/.t
 ok('输入框是后渲染的,晚一点再找两次', /setTimeout\(find, 600\)[\s\S]{0,80}setTimeout\(find, 1800\)/.test(CLIENT))
 ok('贴着底边的旧存档位置一律作废', /stuckToBottom/.test(CLIENT))
 ok('松手时还在挡输入框 → 抬回去且不存盘', /if \(vh > 0 && at\.y > vh - 56 - 40\)/.test(CLIENT))
-ok('注释里记着作者原话', /它会挡着确认键/.test(CLIENT))
+ok('注释里记着boss原话', /它会挡着确认键/.test(CLIENT))
 
 console.log('')
 console.log('══ ⑨ 回归:wantsWhite 的作用域 ══')
@@ -174,7 +194,7 @@ ok('wantsWhite 声明在两个 if 块之外(00:40 又栽在这里)',
   '这是 23:18 / 00:40 两次栽过的同一个坑')
 
 console.log('')
-console.log('══ ⑩ 音效批量添加 + 容量上限(作者 10-19 13:55 选的 B:单个 8MB / 总量 200MB / 30 条)══')
+console.log('══ ⑩ 音效批量添加 + 容量上限(boss 10-19 13:55 选的 B:单个 8MB / 总量 200MB / 30 条)══')
 const hostNum = (name) => {
   const m = HOST.match(new RegExp('const ' + name + ' = ([\\d *]+)'))
   return m ? m[1].split('*').map((s) => Number(s.trim())).reduce((a, b) => a * b, 1) : NaN

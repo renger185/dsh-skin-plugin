@@ -9,3 +9,21 @@
         # 导一个文件夹也不会把索引撑成大 JSON。
         libraryFile: '<你的数据目录>/library.json'
         imageDir: '<你的数据目录>/images'
+        # 彩蛋：渠道限流贴纸的数据源（台账由 渠道限流台账维护脚本 维护）。
+        # 读不到就当没有，贴纸就是空的 —— 不猜、不报错。
+        channelLimitFile: '<你的数据目录>/渠道限流快照.json'
+        # 【10-22 08:0x boss选 B】更新检查用的仓库（owner/repo）+ 分支。
+        # 别人装了插件之后，面板里能提示"有新版本"——GitHub 本身不会通知下载过的人。
+        # 留空 = 不检查，面板里什么都不显示。
+        updateRepo: 'renger185/dsh-skin-plugin'
+        updateBranch: 'main'
+        # 清单在仓库的 plugin/ 下（手机远程那份在**仓库根目录**，两个仓库布局不一样）
+        updatePkgPath: 'plugin/package.json'
+        # 【10-22 08:2x boss】「推荐项目就写我们自己的项目，目前只有一个手机远程」
+        #   Star / Fork 由主机端实时读 GitHub；读不到就不显示那个数字（不编、不凑版面）。
+        updateProjects:
+          - id: phone-remote
+            name: '手机远程 · Phone Remote'
+            repo: 'renger185/dsh-phone-remote'
+            tagline: '手机浏览器打开本机 DSH、任务完成推到手机、微信里一句话召唤远程入口'
+

@@ -202,7 +202,7 @@ async function main() {
    */
   const clientWash = Number((CLIENT.match(/const MAX_WASH = (\d+)/) || [])[1])
   const hostWash = Number((SRC.match(/const MAX_WASH = (\d+)/) || [])[1])
-  ok('页面和主机端的遮罩上限一致，且是作者要的 0~40%', clientWash === 40 && hostWash === 40, `页面 ${clientWash} / 主机 ${hostWash}`)
+  ok('页面和主机端的遮罩上限一致，且是boss要的 0~40%', clientWash === 40 && hostWash === 40, `页面 ${clientWash} / 主机 ${hostWash}`)
   ok('主机端写盘前用的是这个常量（不是写死的数）', /Math\.min\(MAX_WASH, Math\.max\(0, Math\.round\(value\)\)\)/.test(SRC))
 
   /**
@@ -230,7 +230,7 @@ async function main() {
   }
 
   /**
-   * ⑩ 首次安装自带音效（作者 10-19 21:4x：「默认的音效，可以选择我们目前拥有的这几个带上去」）
+   * ⑩ 首次安装自带音效（boss 10-19 21:4x：「默认的音效，可以选择我们目前拥有的这几个带上去」）
    * 判据：**全新目录**（没有 index.json）才铺；已经有索引就不动（删掉的不会自己长回来）。
    */
   {
@@ -287,7 +287,7 @@ async function main() {
   }
 
   /**
-   * ⑪ 撤掉的品牌音效会自动清掉（作者 10-20 02:5x：「把 CS / QQ 的撤掉，其他的放在里面」）
+   * ⑪ 撤掉的品牌音效会自动清掉（boss 10-20 02:5x：「把 CS / QQ 的撤掉，其他的放在里面」）
    * 判据：模拟一台「老装机」—— sounds/index.json 里已有 4 条保留 + 2 条品牌（CS / QQ），
    * 重新装配后：品牌条目从列表消失、文件也从磁盘删掉；保留的 2 条一个不少。
    */

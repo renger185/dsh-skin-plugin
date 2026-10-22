@@ -1,7 +1,7 @@
 /**
  * 「静态色板当底」审计（10-19 13:1x）
  *
- * 为什么查这个：作者红框圈出来的是**交付文件卡片**（消息里那个白底卡片）。
+ * 为什么查这个：boss红框圈出来的是**交付文件卡片**（消息里那个白底卡片）。
  * 它的底不是 alias token，而是组件自己的一枚局部变量：
  *   .flL80G_root{--deliverable-fill:var(--dsw-static-neutral-50);...}
  *   .flL80G_file{background:var(--deliverable-fill)}
